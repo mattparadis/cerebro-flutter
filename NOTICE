@@ -1,0 +1,22 @@
+flutter-ui-ux-design-skill
+Copyright 2026 the flutter-ui-ux-design-skill authors
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This project draws on ideas and checklist items from the following
+MIT-licensed projects. No source code is copied; where wording is
+adapted, the source is named in the file that uses it.
+
+- Checklist Design skills (https://github.com/Checklist-Design/skills)
+  audit statuses (present / partial / missing / not needed / can't tell),
+  strengths-first critique convention.
+- mobile-screen-eval (https://github.com/jainulabudeenm/mobile-screen-eval)
+  three-layer evaluation (Nielsen heuristics, WCAG 2.1 AA, mobile
+  platform accessibility), 0-4 severity scale, batch report layout.
+- design-skills by parhamb (https://github.com/parhamb/design-skills)
+  navigation and visual-design checklist items.
+- appllama-skills (https://github.com/Appllama/appllama-skills)
+  navigation semantics (push vs replace, sheet vs page, no-back screens).
+
+The capture harness follows the image-capture pattern used by
+flutter_test (BSD-3-Clause, Copyright 2014 The Flutter Authors).

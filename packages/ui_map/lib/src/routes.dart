@@ -1,0 +1,168 @@
+import 'package:go_router/go_router.dart';
+
+import 'config.dart';
+
+/// One route in the app's route tree, with its full path.
+class RouteNode {
+  RouteNode({
+    required this.kind,
+    required this.path,
+    required this.name,
+    required this.children,
+  });
+
+  /// `route`, `shell`, `stateful_shell`, `branch`.
+  final String kind;
+
+  /// Full path for `route` nodes (e.g. `/notes/:id`); null for shells.
+  final String? path;
+  final String? name;
+  final List<RouteNode> children;
+
+  bool get hasParams => path != null && path!.contains(':');
+
+  Map<String, Object?> toJson() => {
+        'kind': kind,
+        if (path != null) 'path': path,
+        if (name != null) 'name': name,
+        if (children.isNotEmpty) 'children': children.map((c) => c.toJson()).toList(),
+      };
+}
+
+/// Walks `router.configuration.routes`. For [StatefulShellRoute] only
+/// `branches[].routes` is visited: its `routes` getter is already the
+/// flattened union of all branches.
+List<RouteNode> enumerateRoutes(GoRouter router) {
+  final config = router.configuration;
+
+  RouteNode visit(RouteBase route) {
+    if (route is GoRoute) {
+      return RouteNode(
+        kind: 'route',
+        path: config.locationForRoute(route),
+        name: route.name,
+        children: route.routes.map(visit).toList(),
+      );
+    }
+    if (route is StatefulShellRoute) {
+      return RouteNode(
+        kind: 'stateful_shell',
+        path: null,
+        name: null,
+        children: [
+          for (final branch in route.branches)
+            RouteNode(
+              kind: 'branch',
+              path: null,
+              name: null,
+              children: branch.routes.map(visit).toList(),
+            ),
+        ],
+      );
+    }
+    if (route is ShellRoute) {
+      return RouteNode(
+        kind: 'shell',
+        path: null,
+        name: null,
+        children: route.routes.map(visit).toList(),
+      );
+    }
+    // Unknown RouteBase subclass: still descend.
+    return RouteNode(
+      kind: route.runtimeType.toString(),
+      path: null,
+      name: null,
+      children: route.routes.map(visit).toList(),
+    );
+  }
+
+  return config.routes.map(visit).toList();
+}
+
+/// Flat list of `route` nodes in tree order.
+List<RouteNode> flattenRoutes(List<RouteNode> tree) {
+  final out = <RouteNode>[];
+  void walk(RouteNode n) {
+    if (n.kind == 'route') out.add(n);
+    n.children.forEach(walk);
+  }
+
+  tree.forEach(walk);
+  return out;
+}
+
+/// A concrete location to render.
+class ScreenTarget {
+  const ScreenTarget({
+    required this.routePath,
+    required this.routeName,
+    required this.location,
+    this.skippedReason,
+  });
+
+  final String routePath;
+  final String? routeName;
+  final String location;
+
+  /// Non-null when the route cannot be rendered (missing params, excluded).
+  final String? skippedReason;
+
+  bool get skipped => skippedReason != null;
+}
+
+/// Expands routes into locations using config params / variants / exclusions.
+List<ScreenTarget> expandTargets(List<RouteNode> tree, UiMapConfig config) {
+  final targets = <ScreenTarget>[];
+  for (final r in flattenRoutes(tree)) {
+    final path = r.path!;
+    final opts = config.routes[path] ?? const RouteOptions();
+    if (opts.skip || config.exclude.contains(path)) {
+      targets.add(ScreenTarget(
+        routePath: path,
+        routeName: r.name,
+        location: path,
+        skippedReason: 'excluded in ui_map.yaml',
+      ));
+      continue;
+    }
+    var location = path;
+    final missing = <String>[];
+    location = location.replaceAllMapped(RegExp(r':(\w+)'), (m) {
+      final key = m.group(1)!;
+      final v = opts.params[key];
+      if (v == null) missing.add(key);
+      return v ?? m.group(0)!;
+    });
+    if (missing.isNotEmpty) {
+      targets.add(ScreenTarget(
+        routePath: path,
+        routeName: r.name,
+        location: path,
+        skippedReason: 'missing params: ${missing.join(', ')} (add routes."$path".params in ui_map.yaml)',
+      ));
+      continue;
+    }
+    targets.add(ScreenTarget(routePath: path, routeName: r.name, location: location));
+    for (final v in opts.variants) {
+      final suffix = v.startsWith('?') ? v : '?$v';
+      targets.add(ScreenTarget(routePath: path, routeName: r.name, location: '$location$suffix'));
+    }
+  }
+  return targets;
+}
+
+/// File-system safe id for a location: `/notes?state=empty` -> `notes__state-empty`,
+/// `/` -> `root`, `/notes/1` -> `notes_1`.
+String slugForLocation(String location) {
+  var s = location;
+  if (s.startsWith('/')) s = s.substring(1);
+  if (s.isEmpty) return 'root';
+  final parts = s.split('?');
+  var slug = parts.first.replaceAll('/', '_');
+  if (parts.length > 1 && parts[1].isNotEmpty) {
+    slug += '__${parts[1].replaceAll('=', '-').replaceAll('&', '_')}';
+  }
+  slug = slug.replaceAll(RegExp(r'[^A-Za-z0-9_\-.]'), '-');
+  return slug;
+}

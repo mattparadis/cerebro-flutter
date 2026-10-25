@@ -1,0 +1,16 @@
+# ui_map configuration for the demo app.
+devices:
+  - { name: phone, width: 393, height: 852, dpr: 3, safe_area: { top: 24, bottom: 24 } }
+themes: [light, dark]
+platforms: [android]
+settle_ms: 600
+export_scale: 2
+min_tap_size: 48
+
+routes:
+  "/notes/:id": { params: { id: "1" } }
+  "/notes":     { variants: ["?state=empty", "?state=loading", "?state=error"] }
+
+exclude: []
+fonts: {}
+out_dir: .ui-map

@@ -1,0 +1,58 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:ui_map/ui_map.dart';
+
+void main() {
+  test('defaults when file is missing', () {
+    final c = UiMapConfig.load('/nonexistent/ui_map.yaml');
+    expect(c.devices.single.name, 'phone');
+    expect(c.themes, ['light', 'dark']);
+    expect(c.platforms, ['android']);
+    expect(c.settleMs, 600);
+    expect(c.exportScale, 2);
+    expect(c.minTapSize, 48);
+    expect(c.outDir, '.ui-map');
+  });
+
+  test('parses yaml', () {
+    final dir = Directory.systemTemp.createTempSync('ui_map_cfg');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final f = File('${dir.path}/ui_map.yaml')..writeAsStringSync('''
+devices:
+  - { name: small, width: 320, height: 568, dpr: 2, safe_area: { top: 47, bottom: 34 } }
+  - { name: tablet, width: 834, height: 1194, dpr: 2 }
+themes: [dark]
+platforms: [android, ios]
+settle_ms: 1000
+export_scale: 1
+min_tap_size: 44
+routes:
+  "/items/:id": { params: { id: 42 } }
+  "/items": { variants: ["?state=empty"] }
+  "/debug": { skip: true }
+exclude: ["/secret"]
+fonts:
+  Inter: [assets/fonts/Inter.ttf]
+out_dir: build/ui
+''');
+    final c = UiMapConfig.load(f.path);
+    expect(c.devices.map((d) => d.name), ['small', 'tablet']);
+    expect(c.devices.first.dpr, 2);
+    expect(c.devices.first.safeTop, 47);
+    expect(c.devices.first.safeBottom, 34);
+    expect(c.devices.last.safeTop, 24);
+    expect(c.themes, ['dark']);
+    expect(c.platforms, ['android', 'ios']);
+    expect(c.settleMs, 1000);
+    expect(c.exportScale, 1);
+    expect(c.minTapSize, 44);
+    expect(c.routes['/items/:id']!.params, {'id': '42'});
+    expect(c.routes['/items']!.variants, ['?state=empty']);
+    expect(c.routes['/debug']!.skip, isTrue);
+    expect(c.exclude, ['/secret']);
+    expect(c.fonts, {'Inter': ['assets/fonts/Inter.ttf']});
+    expect(c.outDir, 'build/ui');
+    expect(c.toJson()['routes'], isA<Map>());
+  });
+}
