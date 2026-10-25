@@ -148,6 +148,32 @@ names are read from the running `MaterialApp`, each screen is opened with
 `routes.<name>.args` (YAML values). Apps without a dark theme should set
 `themes: [light]`.
 
+### Real apps: plugins, network, fonts
+
+What a medium-sized production app needed to capture cleanly (all of it
+lives in `test/ui_map/app_factory.dart` and `ui_map.yaml`, nothing in
+`lib/`):
+
+- **Plugins** have no implementation under `flutter test`. Screens that
+  await `flutter_secure_storage`, `shared_preferences`, permissions or
+  geolocation stay on their spinner forever. Mock the channels in
+  `buildApp()` (`SharedPreferences.setMockInitialValues({})`,
+  `TestDefaultBinaryMessengerBinding...setMockMethodCallHandler(...)`
+  returning `null`/empty maps). Firebase that is only initialised in
+  `main()` needs nothing: the factory never runs `main()`.
+- **Network**: set `real_async_ms: 500`. The test binding answers every
+  HTTP request with 400, so screens settle to their error/empty state
+  instead of spinning in the fake-async zone.
+- **google_fonts** cannot fetch in tests. Download the TTFs once (OFL)
+  into `test/ui_map/fonts/`, set `GoogleFonts.config.allowRuntimeFetching
+  = false` in the factory, and list them in `fonts:` under the family
+  names google_fonts registers: `<Family>_regular`, `<Family>_500`,
+  `<Family>_600`, `<Family>_700`, `<Family>_italic`, `<Family>_700italic`.
+  Add a plain `<Family>` entry for `TextStyle(fontFamily:)` uses.
+- **Auth guards**: screens that pop when no user is stored land on the
+  initial route; `map.json` records `redirected_to` and the audit skill
+  reports the redirect once instead of auditing the login screen 20 times.
+
 Requirements: Flutter ≥ 3.44; `go_router` ≥ 18 or `MaterialApp.routes`. Routes with `:params` need
 sample values in `ui_map.yaml`; screens that hit the network or platform
 channels at build time will render their error/empty branch (no HTTP in
