@@ -66,6 +66,8 @@ class UiMapConfig {
     this.outDir = '.ui-map',
     this.lintExclude,
     this.lintRules = const {},
+    this.explore = false,
+    this.exploreMaxTaps = 40,
   });
 
   final List<DeviceSpec> devices;
@@ -88,6 +90,10 @@ class UiMapConfig {
   /// `lint.exclude` globs (null = lint defaults) and `lint.rules` id -> bool.
   final List<String>? lintExclude;
   final Map<String, bool> lintRules;
+
+  /// Tap every semantics target of each screen and record where it leads.
+  final bool explore;
+  final int exploreMaxTaps;
 
   static UiMapConfig load(String path) {
     final file = File(path);
@@ -150,6 +156,8 @@ class UiMapConfig {
       exclude: _strings(m['exclude']) ?? const [],
       fonts: fonts,
       outDir: '${m['out_dir'] ?? d.outDir}',
+      explore: m['explore'] == true,
+      exploreMaxTaps: (m['explore_max_taps'] as num?)?.toInt() ?? d.exploreMaxTaps,
       lintExclude: _strings((m['lint'] as Map?)?['exclude']),
       lintRules: {
         for (final e in (((m['lint'] as Map?)?['rules'] as Map?) ?? {}).entries) '${e.key}': e.value == true,
@@ -177,6 +185,8 @@ class UiMapConfig {
         'fonts': fonts,
         'out_dir': outDir,
         'lint': {'exclude': lintExclude, 'rules': lintRules},
+        'explore': explore,
+        'explore_max_taps': exploreMaxTaps,
       };
 
   static List<String>? _strings(Object? v) =>

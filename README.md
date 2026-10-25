@@ -47,6 +47,15 @@ example/demo_app/         Flutter app with planted design defects, used as fixtu
    `.ui-map/audit/<screen>.md` plus `SUMMARY.md` with the single
    highest-leverage change.
 
+With `--explore` (or `explore: true`), the harness also taps every
+semantics target of each screen on a fresh instance and records where it
+leads: a `push`, `pop` or `go` to another location, an overlay (dialog,
+sheet, snackbar), an `error` (for instance "nothing to pop" on a screen
+reached by deep link), or nothing. `map.json` gets `edges` and
+`dead_taps`; `MAP.md` gets a second Mermaid graph with the **real**
+navigation edges labelled by the control that triggers them. On the demo
+this takes about 20 s for 62 taps.
+
 Large-text variants (`text_scales: [1.0, 1.3]`) and prototype routes
 (`dart run ui_map capture -D UI_PROTO=true`) are captured the same way.
 
@@ -62,6 +71,7 @@ cd example/demo_app
 dart run ui_map routes                     # 12 locations, incl. /notes?state=empty|loading|error
 dart run ui_map capture                    # 48 PNGs (12 locations × light/dark × 1.0/1.3 text) in ~30 s
 dart run ui_map capture -D UI_PROTO=true   # + the two prototype directions under /__proto/note-detail
+dart run ui_map capture --explore          # + real navigation edges by tapping every target
 ```
 
 The generated `MAP.md` starts with the route tree:
@@ -206,6 +216,8 @@ routes:
 exclude: []
 fonts: {}                   # family -> font files, for custom fonts
 out_dir: .ui-map
+explore: false              # tap every target and record navigation edges
+explore_max_taps: 40
 lint:
   exclude: ["**/*.g.dart", "**/theme.dart", "**/theme/**"]
   rules: { no-safe-area: false }   # disable a rule
@@ -213,7 +225,6 @@ lint:
 
 ## Roadmap
 
-- Dynamic navigation edges by exploring taps on every screen.
 - MCP wrapper, Android emulator capture for native plugins, Navigator 1.0
   / auto_route support, network image mocking.
 

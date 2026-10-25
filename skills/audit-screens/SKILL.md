@@ -48,6 +48,21 @@ screens in depth and only skim unchanged ones, and report regressions it
 lists (new layout exceptions, new small targets, screens that stopped
 rendering) as severity 3-4 findings.
 
+Run the capture with `--explore` when auditing navigation (or when the
+app is small): `map.json` then has `edges` (what every tap does) and
+`dead_taps`. Use them as evidence:
+
+- a `dead_taps` entry on a button, tile with a chevron, chip or link is a
+  confirmed "looks interactive, does nothing" finding (severity 3 on
+  primary actions, 2 otherwise); ignore text fields, switches, checkboxes
+  and page indicators, whose effect is state the capture cannot see;
+- an `error` edge saying "nothing to pop" means the screen is reachable by
+  deep link without a parent stack and its close/back action crashes
+  there (severity 2: guard with `context.canPop()` or use `go`);
+- compare `kind` with the navigation semantics in the checklist: a detail
+  opened with `go` instead of `push` loses the back stack; a modal
+  creation flow should be `push`.
+
 If `fonts.warnings` is non-empty, say so: glyph-level findings (type scale,
 line length) are unreliable with the fallback font.
 

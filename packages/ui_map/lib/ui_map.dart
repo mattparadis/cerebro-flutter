@@ -5,6 +5,7 @@ export 'src/capture.dart' show AppBuilder, ContrastReport, LowContrast, RouterBu
 export 'src/config.dart';
 export 'src/contrast.dart';
 export 'src/diff.dart';
+export 'src/edges.dart';
 export 'src/fonts.dart';
 export 'src/lint.dart';
 export 'src/map_writer.dart';

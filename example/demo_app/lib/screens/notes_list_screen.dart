@@ -53,9 +53,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
           if (snapshot.hasError) {
             return _ErrorState(
               message: snapshot.error.toString(),
-              onRetry: () => setState(
-                () => _future = const NotesRepository().list(ListState.full),
-              ),
+              onRetry: () => setState(() {
+                _future = const NotesRepository().list(ListState.full);
+              }),
             );
           }
           if (!snapshot.hasData) {

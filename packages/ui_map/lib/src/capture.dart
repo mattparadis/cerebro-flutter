@@ -12,6 +12,7 @@ import 'package:path/path.dart' as p;
 
 import 'config.dart';
 import 'contrast.dart';
+import 'edges.dart';
 import 'fonts.dart';
 import 'routes.dart';
 
@@ -32,10 +33,12 @@ class UiMap {
     const outEnv = String.fromEnvironment('UI_MAP_OUT');
     const cfgEnv = String.fromEnvironment('UI_MAP_CONFIG');
     const mode = String.fromEnvironment('UI_MAP_MODE', defaultValue: 'capture');
+    const exploreEnv = String.fromEnvironment('UI_MAP_EXPLORE');
 
     final projectRoot = Directory.current.path;
     final configPath = cfgEnv.isEmpty ? p.join(projectRoot, 'ui_map.yaml') : cfgEnv;
     final config = UiMapConfig.load(configPath);
+    final explore = exploreEnv == 'true' || (exploreEnv.isEmpty && config.explore);
     final outDir = outEnv.isEmpty ? p.join(projectRoot, config.outDir) : outEnv;
     Directory(outDir).createSync(recursive: true);
 
@@ -74,6 +77,11 @@ class UiMap {
             for (final scale in config.textScales) {
               final suffix = scale == 1.0 ? '' : '__x${_fmtScale(scale)}';
               final id = '${slugForLocation(t.location)}__${device.name}__${theme}__$platform$suffix';
+              final exploreThis = explore &&
+                  scale == 1.0 &&
+                  theme == config.themes.first &&
+                  platform == config.platforms.first &&
+                  device == config.devices.first;
               testWidgets('ui_map $id', (tester) async {
                 await _captureOne(
                   tester,
@@ -83,6 +91,7 @@ class UiMap {
                   theme: theme,
                   platform: platform,
                   textScale: scale,
+                  explore: exploreThis,
                   config: config,
                   outDir: outDir,
                   buildRouter: buildRouter,
@@ -104,6 +113,7 @@ class UiMap {
     required String theme,
     required String platform,
     required double textScale,
+    required bool explore,
     required UiMapConfig config,
     required String outDir,
     required RouterBuilder buildRouter,
@@ -220,6 +230,20 @@ class UiMap {
         result['semantics'] = p.relative(semPath, from: outDir);
         result['sha256_semantics'] = sha256.convert(utf8.encode(dump)).toString();
         final tappables = collectTappables(root, dpr: device.dpr, minTapSize: config.minTapSize);
+        if (explore) {
+          result['edges'] = (await _explore(
+            tester,
+            target: target,
+            tappables: tappables,
+            themeMode: themeMode,
+            config: config,
+            buildRouter: buildRouter,
+            buildApp: buildApp,
+            device: device,
+          ))
+              .map((e) => e.toJson())
+              .toList();
+        }
         result['tappables_count'] = tappables.length;
         result['tappables_below_min'] = [
           for (final t in tappables)
@@ -246,6 +270,83 @@ class UiMap {
       _writeJson(p.join(resultsDir.path, '$id.json'), result);
     }
     if (failure != null) fail('ui_map: $id failed: $failure');
+  }
+
+  /// Taps every (non-nested) semantics target of the screen, each time on a
+  /// freshly built app, and records where the router ends up or which
+  /// overlay appeared.
+  static Future<List<NavEdge>> _explore(
+    WidgetTester tester, {
+    required ScreenTarget target,
+    required List<Tappable> tappables,
+    required ThemeMode themeMode,
+    required UiMapConfig config,
+    required RouterBuilder buildRouter,
+    required AppBuilder buildApp,
+    required DeviceSpec device,
+  }) async {
+    final edges = <NavEdge>[];
+    final candidates = tappables.where((t) => !t.nestedInLargerTarget).take(config.exploreMaxTaps).toList();
+    var unlabeled = 0;
+    for (final t in candidates) {
+      final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
+      final router = buildRouter(initialLocation: target.location);
+      await tester.pumpWidget(
+        _withInsetBands(buildApp(router, themeMode: themeMode), top: device.safeTop, bottom: device.safeBottom),
+      );
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      while (tester.takeException() != null) {}
+      // `router.state` describes the top-most route, including imperative
+      // pushes, which the configuration's own `uri` does not reflect.
+      final depthBefore = router.routerDelegate.currentConfiguration.matches.length;
+      final from = router.state.uri.toString();
+      String? error;
+      try {
+        await tester.tapAt(Offset(t.left + t.width / 2, t.top + t.height / 2));
+        for (var i = 0; i < 8; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      } catch (e) {
+        error = _firstLine(e.toString());
+      }
+      for (var e = tester.takeException(); e != null; e = tester.takeException()) {
+        error ??= _firstLine(e.toString());
+      }
+      final depthAfter = router.routerDelegate.currentConfiguration.matches.length;
+      final to = router.state.uri.toString();
+      String? overlay;
+      if (find.byType(Dialog).evaluate().isNotEmpty || find.byType(AlertDialog).evaluate().isNotEmpty) {
+        overlay = 'dialog';
+      } else if (find.byType(BottomSheet).evaluate().isNotEmpty) {
+        overlay = 'sheet';
+      } else if (find.byType(SnackBar).evaluate().isNotEmpty) {
+        overlay = 'snackbar';
+      } else if (find.byType(PopupMenuButton).evaluate().isNotEmpty &&
+          find.byWidgetPredicate((w) => w.runtimeType.toString().contains('_PopupMenu')).evaluate().isNotEmpty) {
+        overlay = 'menu';
+      }
+      if (overlay != null && to != from) overlay = null; // navigation wins
+      edges.add(NavEdge(
+        from: from,
+        label: label,
+        to: to,
+        kind: classifyEdge(
+          from: from,
+          to: to,
+          depthBefore: depthBefore,
+          depthAfter: depthAfter,
+          overlay: overlay,
+          error: error,
+        ),
+        overlay: overlay,
+        error: error,
+        x: t.left + t.width / 2,
+        y: t.top + t.height / 2,
+      ));
+    }
+    return edges;
   }
 
   /// Draws the simulated status-bar and navigation-bar areas as translucent

@@ -63,6 +63,11 @@ fonts: {}
 
 out_dir: .ui-map
 
+# Navigation edges: tap every target of each screen (first device/theme,
+# text scale 1.0) and record where it leads. Or pass --explore on the CLI.
+explore: false
+explore_max_taps: 40
+
 # `dart run ui_map lint`: regex rules for design defects the analyzer does
 # not know about. Globs are skipped for the colour/font rules.
 lint:

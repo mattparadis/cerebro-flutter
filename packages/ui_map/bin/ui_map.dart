@@ -34,6 +34,8 @@ Future<void> main(List<String> argv) async {
     ..addOption('out', help: 'Output directory (default: out_dir in config, else .ui-map).')
     ..addMultiOption('dart-define', abbr: 'D',
         help: 'Extra --dart-define=KEY=VALUE forwarded to flutter test (e.g. -D UI_PROTO=true).')
+    ..addFlag('explore', negatable: false,
+        help: 'Also tap every target of each screen and record the navigation edges (slower).')
     ..addOption('baseline', help: 'Baseline map.json or directory (default: <out>/baseline).')
     ..addOption('fail-on',
         allowed: ['none', 'regression', 'any'],
@@ -65,7 +67,10 @@ Future<void> main(List<String> argv) async {
   final configPath = p.absolute(args['config'] as String? ?? p.join(root, 'ui_map.yaml'));
   final outDir = p.absolute(args['out'] as String? ?? _outDirFromConfig(configPath) ?? p.join(root, '.ui-map'));
 
-  final defines = (args['dart-define'] as List<String>);
+  final defines = [
+    ...(args['dart-define'] as List<String>),
+    if (args['explore'] == true) 'UI_MAP_EXPLORE=true',
+  ];
   switch (args.rest.first) {
     case 'init':
       _init(root, configPath, force: args['force'] == true);
@@ -191,7 +196,8 @@ Future<int> _capture(String root, String configPath, String outDir, List<String>
   stdout.writeln('ui_map: ${summary['ok']}/${summary['screens']} screens captured, '
       '${summary['error']} errors, ${summary['with_exceptions']} with layout exceptions, '
       '${summary['with_small_tappables']} with small tap targets, '
-      '${summary['with_low_contrast']} with low-contrast text.');
+      '${summary['with_low_contrast']} with low-contrast text'
+      '${(summary['explored_taps'] as int) > 0 ? ', ${summary['explored_taps']} taps explored (${summary['dead_taps']} dead)' : ''}.');
   stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'map.json'), from: root)} and MAP.md written.');
   if (testCode != 0 || (summary['error'] as int) > 0) return 1;
   return 0;

@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'edges.dart';
+
 /// Merges `routes.json`, `fonts.json` and `results/*.json` into `map.json`
 /// and renders `MAP.md` (Mermaid route tree + thumbnail table).
 class MapWriter {
@@ -29,6 +31,11 @@ class MapWriter {
       for (final t in targets)
         if (t['skipped'] != null) {'route': t['route'], 'reason': t['skipped']},
     ];
+    final edges = <Map<String, Object?>>[
+      for (final s in screens)
+        for (final e in (s['edges'] as List?) ?? const []) (e as Map).cast<String, Object?>(),
+    ];
+    final deadTaps = edges.where((e) => e['kind'] == 'none').toList();
     final map = <String, Object?>{
       'generated_at': DateTime.now().toUtc().toIso8601String(),
       'flutter_version': flutterVersion,
@@ -43,7 +50,11 @@ class MapWriter {
         'with_exceptions': screens.where((s) => ((s['exceptions'] as List?) ?? []).isNotEmpty).length,
         'with_small_tappables': screens.where((s) => ((s['tappables_below_min'] as List?) ?? []).isNotEmpty).length,
         'with_low_contrast': screens.where((s) => ((s['low_contrast'] as List?) ?? []).isNotEmpty).length,
+        'explored_taps': edges.length,
+        'dead_taps': deadTaps.length,
       },
+      'edges': edges,
+      'dead_taps': deadTaps,
       'screens': screens,
     };
     File(p.join(outDir, 'map.json')).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(map));
@@ -102,6 +113,31 @@ class MapWriter {
     }
     b.writeln('```');
     b.writeln();
+
+    final edges = (map['edges'] as List?)?.cast<Map>().map((e) => e.cast<String, Object?>()).toList() ?? const [];
+    if (edges.isNotEmpty) {
+      b.writeln('## Navigation graph (explored by tapping)');
+      b.writeln();
+      b.writeln('Thick arrows push, thin arrows pop, dashed arrows open an overlay. '
+          '${summary['explored_taps']} taps explored, ${summary['dead_taps']} did nothing.');
+      b.writeln();
+      b.writeln('```mermaid');
+      b.write(renderEdgesMermaid(edges));
+      b.writeln('```');
+      b.writeln();
+      final dead = (map['dead_taps'] as List?)?.cast<Map>() ?? const [];
+      if (dead.isNotEmpty) {
+        b.writeln('### Taps that did nothing');
+        b.writeln();
+        b.writeln('Controls that expose a tap action but neither navigate nor open anything. '
+            'Either unimplemented handlers or state changes the capture cannot see (toggles, text fields).');
+        b.writeln();
+        for (final d in dead) {
+          b.writeln('- `${d['from']}` · "${d['label']}" at (${d['x']}, ${d['y']})');
+        }
+        b.writeln();
+      }
+    }
 
     final skipped = (map['skipped'] as List?)?.cast<Map>() ?? const [];
     if (skipped.isNotEmpty) {

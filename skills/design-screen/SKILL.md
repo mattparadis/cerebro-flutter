@@ -140,8 +140,12 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
    states by query parameter when the data layer allows it
    (`?state=empty|loading|error`), so they can be captured.
 3. Add the route (and its `params` / `variants`) to `ui_map.yaml`, run
-   `dart run ui_map capture`, and look at every PNG of the new screen in
-   light and dark (and `__x1.3` if `text_scales` includes 1.3).
+   `dart run ui_map capture --explore`, and look at every PNG of the new
+   screen in light and dark (and `__x1.3` if `text_scales` includes 1.3).
+   Check the new screen's `edges` in `map.json`: every button navigates
+   or opens what the brief says, nothing lands in `dead_taps`, and the
+   back/close action works when the screen is opened directly (no
+   "nothing to pop" error).
 4. Self-audit against the `audit-screens` checklist if that skill is
    installed, otherwise against `anti-patterns.md` and step 3 above.
    Fix anything of severity 3-4 (touch target, contrast, missing state,
