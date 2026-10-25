@@ -247,6 +247,7 @@ class UiMap {
         result['text_nodes_checked'] = report.checked;
         result['low_contrast'] = report.low.map((e) => e.toJson()).toList();
         result['low_contrast_icons'] = report.lowIcons.map((e) => e.toJson()).toList();
+        result['text_without_font_family'] = report.noFontFamily;
       }
       result['png'] = p.relative(pngPath, from: outDir);
       result['sha256_png'] = sha256.convert(File(pngPath).readAsBytesSync()).toString();
@@ -541,13 +542,22 @@ class LowContrast {
 }
 
 class ContrastReport {
-  const ContrastReport({required this.checked, required this.low, this.lowIcons = const []});
+  const ContrastReport({
+    required this.checked,
+    required this.low,
+    this.lowIcons = const [],
+    this.noFontFamily = const [],
+  });
 
   final int checked;
   final List<LowContrast> low;
 
   /// Icon glyphs (private-use codepoints) below 3:1.
   final List<LowContrast> lowIcons;
+
+  /// Texts whose TextStyle resolves to no font family: drawn as blocks in
+  /// the capture, platform font on device.
+  final List<Map<String, Object?>> noFontFamily;
 }
 
 /// Measures WCAG contrast for every rendered paragraph: the text colour is
@@ -563,6 +573,7 @@ ContrastReport measureTextContrast(
   var checked = 0;
   final low = <LowContrast>[];
   final icons = <LowContrast>[];
+  final noFamily = <Map<String, Object?>>[];
   final seen = <String>{};
   for (final element in find.byType(RichText).evaluate()) {
     final ro = element.renderObject;
@@ -579,6 +590,20 @@ ContrastReport measureTextContrast(
     if (rect.isEmpty || rect.width < 2 || rect.height < 2) continue;
     final key = '$plain|${rect.left.round()}|${rect.top.round()}';
     if (!seen.add(key)) continue;
+    // No font family resolved: under `flutter test` this renders with the
+    // FlutterTest font (solid blocks), so contrast is meaningless. Report
+    // it instead: on device the platform font is used, and the text will
+    // not follow the app's font family.
+    if (!isIcon && (style?.fontFamily == null || style!.fontFamily!.isEmpty)) {
+      noFamily.add({
+        'text': plain.length > 40 ? '${plain.substring(0, 40)}…' : plain,
+        'x': Tappable._r(rect.left),
+        'y': Tappable._r(rect.top),
+        'width': Tappable._r(rect.width),
+        'height': Tappable._r(rect.height),
+      });
+      continue;
+    }
     final argb = color.toARGB32();
     final left = (rect.left * scale).round(), top = (rect.top * scale).round();
     final w = (rect.width * scale).round(), h = (rect.height * scale).round();
@@ -620,7 +645,7 @@ ContrastReport measureTextContrast(
   }
   low.sort((a, b) => a.ratio.compareTo(b.ratio));
   icons.sort((a, b) => a.ratio.compareTo(b.ratio));
-  return ContrastReport(checked: checked, low: low, lowIcons: icons);
+  return ContrastReport(checked: checked, low: low, lowIcons: icons, noFontFamily: noFamily);
 }
 
 bool _isPrivateUse(int rune) =>

@@ -89,6 +89,12 @@ light and dark variants side by side.
    - every entry in `exceptions` (RenderFlex overflow, unbounded height, ...);
    - screens with `status: error` (the route could not render in a test;
      usually a missing dependency or side effect in the factory);
+   - `text_without_font_family`: texts whose `TextStyle` resolves to no
+     family (a `TextStyle(...)` that replaces the theme style instead of
+     merging it, e.g. inside `AnimatedDefaultTextStyle`). They render as
+     solid blocks in the PNG, so do not judge them visually; report them
+     once per screen as a theming inconsistency (severity 1-2: on device
+     they fall back to the platform font and ignore the app's family);
    - `redirected_to`: the screen sent the user elsewhere on open (an auth
      guard, a missing-argument fallback). Audit the screen it landed on
      only once, and report the redirect itself if it loses context

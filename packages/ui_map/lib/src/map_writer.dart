@@ -171,6 +171,8 @@ class MapWriter {
         if (small.isNotEmpty) notes.add('${small.length} small tap target(s)');
         final lowc = (s['low_contrast'] as List?) ?? const [];
         if (lowc.isNotEmpty) notes.add('${lowc.length} low-contrast text(s)');
+        final nofam = (s['text_without_font_family'] as List?) ?? const [];
+        if (nofam.isNotEmpty) notes.add('${nofam.length} text(s) without font family (blocks in PNG)');
         if (s['redirected_to'] != null) notes.add('redirects to `${s['redirected_to']}`');
         if (s['error'] != null) notes.add('${s['error']}');
         final png = s['png'];
