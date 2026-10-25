@@ -15,7 +15,8 @@ ui_map: headless screenshots + navigation map for Flutter apps.
 Usage: dart run ui_map <command> [options]
 
 Commands:
-  init      Scaffold ui_map.yaml, test/ui_map/app_factory.dart and the capture test.
+  init      Scaffold ui_map.yaml, test/ui_map/app_factory.dart and the capture test
+            (--navigator for MaterialApp `routes:` apps without go_router).
   routes    Print the route tree and the locations that would be captured.
   capture   Capture every screen, then write .ui-map/map.json and MAP.md.
   baseline  Save the current capture as the baseline (.ui-map/baseline/) for diff.
@@ -29,6 +30,8 @@ Run from the root of the Flutter app (where pubspec.yaml is).
 Future<void> main(List<String> argv) async {
   final parser = ArgParser()
     ..addFlag('force', help: 'Overwrite scaffolded files (init).', negatable: false)
+    ..addFlag('navigator', negatable: false,
+        help: 'init: scaffold for a Navigator 1.0 app (MaterialApp routes:) instead of go_router.')
     ..addFlag('help', abbr: 'h', negatable: false)
     ..addOption('config', help: 'Path to ui_map.yaml (default: ./ui_map.yaml).')
     ..addOption('out', help: 'Output directory (default: out_dir in config, else .ui-map).')
@@ -73,7 +76,7 @@ Future<void> main(List<String> argv) async {
   ];
   switch (args.rest.first) {
     case 'init':
-      _init(root, configPath, force: args['force'] == true);
+      _init(root, configPath, force: args['force'] == true, navigator: args['navigator'] == true);
     case 'routes':
       exit(await _routes(root, configPath, outDir, defines));
     case 'capture':
@@ -104,11 +107,13 @@ String? _outDirFromConfig(String configPath) {
   return m == null ? null : p.join(p.dirname(configPath), m.group(1)!);
 }
 
-void _init(String root, String configPath, {required bool force}) {
+void _init(String root, String configPath, {required bool force, required bool navigator}) {
   final testDir = Directory(p.join(root, 'test', 'ui_map'))..createSync(recursive: true);
   _scaffold(configPath, configTemplate, force: force);
-  _scaffold(p.join(testDir.path, 'app_factory.dart'), appFactoryTemplate, force: force);
-  _scaffold(p.join(testDir.path, 'ui_map_capture_test.dart'), captureTestTemplate, force: true);
+  _scaffold(p.join(testDir.path, 'app_factory.dart'),
+      navigator ? appFactoryNavigatorTemplate : appFactoryTemplate, force: force);
+  _scaffold(p.join(testDir.path, 'ui_map_capture_test.dart'),
+      navigator ? captureTestNavigatorTemplate : captureTestTemplate, force: true);
   stdout.writeln('''
 Next steps:
   1. Fill in test/ui_map/app_factory.dart (buildRouter / buildApp).

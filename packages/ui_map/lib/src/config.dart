@@ -39,10 +39,15 @@ class RouteOptions {
     this.params = const {},
     this.variants = const [],
     this.skip = false,
+    this.args,
   });
 
   /// Values substituted for `:param` segments.
   final Map<String, String> params;
+
+  /// Navigator 1.0 only: `Navigator.pushNamed(..., arguments:)` payload
+  /// (a YAML map/list/scalar) used when the factory gives none.
+  final Object? args;
 
   /// Query strings (e.g. `?state=empty`) appended as extra locations.
   /// The plain location is always captured too.
@@ -134,6 +139,7 @@ class UiMapConfig {
           },
           variants: [for (final s in (v['variants'] as List?) ?? []) '$s'],
           skip: v['skip'] == true,
+          args: v['args'],
         );
       }
     }
@@ -179,6 +185,7 @@ class UiMapConfig {
               'params': e.value.params,
               'variants': e.value.variants,
               'skip': e.value.skip,
+              if (e.value.args != null) 'args': e.value.args,
             },
         },
         'exclude': exclude,

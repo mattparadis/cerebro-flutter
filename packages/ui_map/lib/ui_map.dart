@@ -1,7 +1,8 @@
 /// ui_map: headless screenshot capture and navigation map for Flutter apps.
 library;
 
-export 'src/capture.dart' show AppBuilder, ContrastReport, LowContrast, RouterBuilder, Tappable, UiMap, collectTappables, measureTextContrast;
+export 'src/capture.dart' show ContrastReport, LowContrast, Tappable, UiMap, collectTappables, measureTextContrast;
+export 'src/driver.dart';
 export 'src/config.dart';
 export 'src/contrast.dart';
 export 'src/diff.dart';

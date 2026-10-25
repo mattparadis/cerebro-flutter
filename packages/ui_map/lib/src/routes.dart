@@ -80,6 +80,32 @@ List<RouteNode> enumerateRoutes(GoRouter router) {
   return config.routes.map(visit).toList();
 }
 
+/// Builds a tree from flat route names by path prefix: `/account/payments`
+/// becomes a child of `/account` when that exists, else of the root.
+/// Used for Navigator 1.0 apps, whose `routes` map is flat.
+List<RouteNode> treeFromPaths(Iterable<String> paths) {
+  final sorted = paths.toSet().toList()..sort();
+  final nodes = <String, RouteNode>{};
+  final roots = <RouteNode>[];
+  for (final path in sorted) {
+    final node = RouteNode(kind: 'route', path: path, name: null, children: []);
+    nodes[path] = node;
+    RouteNode? parent;
+    var prefix = path;
+    while (prefix.contains('/') && prefix != '/') {
+      prefix = prefix.substring(0, prefix.lastIndexOf('/'));
+      if (prefix.isEmpty) prefix = '/';
+      if (nodes.containsKey(prefix) && prefix != path) {
+        parent = nodes[prefix];
+        break;
+      }
+      if (prefix == '/') break;
+    }
+    (parent?.children ?? roots).add(node);
+  }
+  return roots;
+}
+
 /// Flat list of `route` nodes in tree order.
 List<RouteNode> flattenRoutes(List<RouteNode> tree) {
   final out = <RouteNode>[];

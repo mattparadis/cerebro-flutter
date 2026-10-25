@@ -7,17 +7,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 
 import 'config.dart';
 import 'contrast.dart';
+import 'driver.dart';
 import 'edges.dart';
 import 'fonts.dart';
 import 'routes.dart';
 
-typedef RouterBuilder = GoRouter Function({required String initialLocation});
-typedef AppBuilder = Widget Function(GoRouter router, {required ThemeMode themeMode});
+export 'driver.dart' show AppBuilder, ArgumentsFor, RootBuilder, RouterBuilder;
 
 /// Entry point called by the generated `test/ui_map/ui_map_capture_test.dart`.
 ///
@@ -27,27 +26,102 @@ typedef AppBuilder = Widget Function(GoRouter router, {required ThemeMode themeM
 class UiMap {
   UiMap._();
 
+  /// go_router apps.
   static void run({required RouterBuilder buildRouter, required AppBuilder buildApp}) {
-    TestWidgetsFlutterBinding.ensureInitialized();
-
-    const outEnv = String.fromEnvironment('UI_MAP_OUT');
-    const cfgEnv = String.fromEnvironment('UI_MAP_CONFIG');
-    const mode = String.fromEnvironment('UI_MAP_MODE', defaultValue: 'capture');
-    const exploreEnv = String.fromEnvironment('UI_MAP_EXPLORE');
-
-    final projectRoot = Directory.current.path;
-    final configPath = cfgEnv.isEmpty ? p.join(projectRoot, 'ui_map.yaml') : cfgEnv;
-    final config = UiMapConfig.load(configPath);
-    final explore = exploreEnv == 'true' || (exploreEnv.isEmpty && config.explore);
-    final outDir = outEnv.isEmpty ? p.join(projectRoot, config.outDir) : outEnv;
-    Directory(outDir).createSync(recursive: true);
-
+    final env = _Env.read();
     final tree = enumerateRoutes(buildRouter(initialLocation: '/'));
-    final targets = expandTargets(tree, config);
-    _writeJson(p.join(outDir, 'routes.json'), {
+    final targets = expandTargets(tree, env.config);
+    _writeRoutes(env, tree, targets, kind: 'go_router');
+    if (env.mode == 'list') {
+      test('ui_map: routes written to routes.json', () {});
+      return;
+    }
+    _registerFonts(env);
+    final driver = GoRouterDriver(buildRouter: buildRouter, buildApp: buildApp);
+    for (final combo in _combos(env)) {
+      for (final t in targets.where((t) => !t.skipped)) {
+        final id = _idFor(t, combo);
+        testWidgets('ui_map $id', (tester) async {
+          await _captureOne(tester, id: id, target: t, combo: combo, env: env, driver: driver);
+        });
+      }
+    }
+  }
+
+  /// Navigator 1.0 apps (`MaterialApp.routes`). Route names are read from
+  /// the running app, so enumeration happens inside the test: one test per
+  /// device × theme × platform × text scale, looping over the screens.
+  static void runNavigator({
+    required RootBuilder buildApp,
+    ArgumentsFor? argumentsFor,
+    String? outDir,
+  }) {
+    final env = _Env.read(outDirOverride: outDir);
+    final configArgs = {
+      for (final e in env.config.routes.entries)
+        if (e.value.args != null) e.key: e.value.args,
+    };
+    final driver = NavigatorDriver(buildApp: buildApp, argumentsFor: argumentsFor, configArgs: configArgs);
+    if (env.mode != 'list') _registerFonts(env);
+    final combos = env.mode == 'list' ? [_combos(env).first] : _combos(env).toList();
+    for (final combo in combos) {
+      testWidgets('ui_map ${env.mode} ${combo.id}', (tester) async {
+        await tester.pumpWidget(buildApp(themeMode: ThemeMode.light));
+        await tester.pump(const Duration(milliseconds: 50));
+        final names = driver.enumerate(tester);
+        // Routes mentioned in ui_map.yaml but not in the map (onGenerateRoute).
+        for (final extra in env.config.routes.keys) {
+          if (!names.contains(extra) && !extra.contains('?')) names.add(extra);
+        }
+        final tree = treeFromPaths(names);
+        final targets = expandTargets(tree, env.config);
+        if (combo == combos.first) _writeRoutes(env, tree, targets, kind: 'navigator');
+        while (tester.takeException() != null) {}
+        if (env.mode == 'list') return;
+        for (final t in targets.where((t) => !t.skipped)) {
+          final id = _idFor(t, combo);
+          // ignore: avoid_print
+          print('ui_map $id');
+          await _captureOne(tester, id: id, target: t, combo: combo, env: env, driver: driver, rethrowFailures: false);
+        }
+      });
+    }
+  }
+
+  static Iterable<_Combo> _combos(_Env env) sync* {
+    final c = env.config;
+    for (final device in c.devices) {
+      for (final theme in c.themes) {
+        for (final platform in c.platforms) {
+          for (final scale in c.textScales) {
+            yield _Combo(
+              device: device,
+              theme: theme,
+              platform: platform,
+              textScale: scale,
+              explore: env.explore &&
+                  scale == 1.0 &&
+                  theme == c.themes.first &&
+                  platform == c.platforms.first &&
+                  device == c.devices.first,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  static String _idFor(ScreenTarget t, _Combo c) {
+    final suffix = c.textScale == 1.0 ? '' : '__x${_fmtScale(c.textScale)}';
+    return '${slugForLocation(t.location)}__${c.device.name}__${c.theme}__${c.platform}$suffix';
+  }
+
+  static void _writeRoutes(_Env env, List<RouteNode> tree, List<ScreenTarget> targets, {required String kind}) {
+    _writeJson(p.join(env.outDir, 'routes.json'), {
       'generated_at': DateTime.now().toUtc().toIso8601String(),
-      'config_path': configPath,
-      'config': config.toJson(),
+      'router': kind,
+      'config_path': env.configPath,
+      'config': env.config.toJson(),
       'tree': tree.map((n) => n.toJson()).toList(),
       'targets': [
         for (final t in targets)
@@ -59,66 +133,31 @@ class UiMap {
           },
       ],
     });
+  }
 
-    if (mode == 'list') {
-      test('ui_map: routes written to routes.json', () {});
-      return;
-    }
-
+  static void _registerFonts(_Env env) {
     setUpAll(() async {
-      final report = await loadRealFonts(extraFonts: _resolveFonts(config.fonts, projectRoot));
-      _writeJson(p.join(outDir, 'fonts.json'), report.toJson());
+      final report = await loadRealFonts(extraFonts: _resolveFonts(env.config.fonts, env.projectRoot));
+      _writeJson(p.join(env.outDir, 'fonts.json'), report.toJson());
     });
-
-    for (final t in targets.where((t) => !t.skipped)) {
-      for (final device in config.devices) {
-        for (final theme in config.themes) {
-          for (final platform in config.platforms) {
-            for (final scale in config.textScales) {
-              final suffix = scale == 1.0 ? '' : '__x${_fmtScale(scale)}';
-              final id = '${slugForLocation(t.location)}__${device.name}__${theme}__$platform$suffix';
-              final exploreThis = explore &&
-                  scale == 1.0 &&
-                  theme == config.themes.first &&
-                  platform == config.platforms.first &&
-                  device == config.devices.first;
-              testWidgets('ui_map $id', (tester) async {
-                await _captureOne(
-                  tester,
-                  id: id,
-                  target: t,
-                  device: device,
-                  theme: theme,
-                  platform: platform,
-                  textScale: scale,
-                  explore: exploreThis,
-                  config: config,
-                  outDir: outDir,
-                  buildRouter: buildRouter,
-                  buildApp: buildApp,
-                );
-              });
-            }
-          }
-        }
-      }
-    }
   }
 
   static Future<void> _captureOne(
     WidgetTester tester, {
     required String id,
     required ScreenTarget target,
-    required DeviceSpec device,
-    required String theme,
-    required String platform,
-    required double textScale,
-    required bool explore,
-    required UiMapConfig config,
-    required String outDir,
-    required RouterBuilder buildRouter,
-    required AppBuilder buildApp,
+    required _Combo combo,
+    required _Env env,
+    required ScreenDriver driver,
+    bool rethrowFailures = true,
   }) async {
+    final device = combo.device;
+    final theme = combo.theme;
+    final platform = combo.platform;
+    final textScale = combo.textScale;
+    final explore = combo.explore;
+    final config = env.config;
+    final outDir = env.outDir;
     final sw = Stopwatch()..start();
     final result = <String, Object?>{
       'id': id,
@@ -143,11 +182,9 @@ class UiMap {
     );
     tester.view.padding = insets;
     tester.view.viewPadding = insets;
-    addTearDown(tester.view.reset);
     result['safe_area'] = {'top': device.safeTop, 'bottom': device.safeBottom};
     if (textScale != 1.0) {
       tester.platformDispatcher.textScaleFactorTestValue = textScale;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     }
 
     final previousPlatform = debugDefaultTargetPlatformOverride;
@@ -167,17 +204,11 @@ class UiMap {
       handle = tester.ensureSemantics();
       final key = GlobalKey();
       final themeMode = theme == 'dark' ? ThemeMode.dark : ThemeMode.light;
-      final router = buildRouter(initialLocation: target.location);
-      await tester.pumpWidget(
-        RepaintBoundary(
-          key: key,
-          child: _withInsetBands(
-            buildApp(router, themeMode: themeMode),
-            top: device.safeTop,
-            bottom: device.safeBottom,
-          ),
-        ),
-      );
+      Widget wrap(Widget app) => RepaintBoundary(
+            key: key,
+            child: _withInsetBands(app, top: device.safeTop, bottom: device.safeBottom),
+          );
+      await driver.open(tester, target.location, themeMode, wrap);
       const step = Duration(milliseconds: 100);
       final steps = (config.settleMs / 100).ceil().clamp(1, 600);
       for (var i = 0; i < steps; i++) {
@@ -237,9 +268,8 @@ class UiMap {
             tappables: tappables,
             themeMode: themeMode,
             config: config,
-            buildRouter: buildRouter,
-            buildApp: buildApp,
-            device: device,
+            driver: driver,
+            wrap: (app) => _withInsetBands(app, top: device.safeTop, bottom: device.safeBottom),
           ))
               .map((e) => e.toJson())
               .toList();
@@ -266,10 +296,16 @@ class UiMap {
       handle?.dispose();
       debugDisableShadows = previousShadows;
       debugDefaultTargetPlatformOverride = previousPlatform;
+      if (textScale != 1.0) tester.platformDispatcher.clearTextScaleFactorTestValue();
+      tester.view.reset();
       result['duration_ms'] = sw.elapsedMilliseconds;
       _writeJson(p.join(resultsDir.path, '$id.json'), result);
     }
-    if (failure != null) fail('ui_map: $id failed: $failure');
+    if (failure != null) {
+      if (rethrowFailures) fail('ui_map: $id failed: $failure');
+      // ignore: avoid_print
+      print('ui_map: $id failed: ${_firstLine(failure)}');
+    }
   }
 
   /// Taps every (non-nested) semantics target of the screen, each time on a
@@ -281,27 +317,22 @@ class UiMap {
     required List<Tappable> tappables,
     required ThemeMode themeMode,
     required UiMapConfig config,
-    required RouterBuilder buildRouter,
-    required AppBuilder buildApp,
-    required DeviceSpec device,
+    required ScreenDriver driver,
+    required AppWrap wrap,
   }) async {
     final edges = <NavEdge>[];
     final candidates = tappables.where((t) => !t.nestedInLargerTarget).take(config.exploreMaxTaps).toList();
     var unlabeled = 0;
     for (final t in candidates) {
       final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
-      final router = buildRouter(initialLocation: target.location);
-      await tester.pumpWidget(
-        _withInsetBands(buildApp(router, themeMode: themeMode), top: device.safeTop, bottom: device.safeBottom),
-      );
+      await driver.open(tester, target.location, themeMode, wrap);
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
       while (tester.takeException() != null) {}
-      // `router.state` describes the top-most route, including imperative
-      // pushes, which the configuration's own `uri` does not reflect.
-      final depthBefore = router.routerDelegate.currentConfiguration.matches.length;
-      final from = router.state.uri.toString();
+      final before = driver.snapshot(tester);
+      final depthBefore = before.depth;
+      final from = before.location;
       String? error;
       try {
         await tester.tapAt(Offset(t.left + t.width / 2, t.top + t.height / 2));
@@ -314,8 +345,9 @@ class UiMap {
       for (var e = tester.takeException(); e != null; e = tester.takeException()) {
         error ??= _firstLine(e.toString());
       }
-      final depthAfter = router.routerDelegate.currentConfiguration.matches.length;
-      final to = router.state.uri.toString();
+      final afterSnap = driver.snapshot(tester);
+      final depthAfter = afterSnap.depth;
+      final to = afterSnap.location;
       String? overlay;
       if (find.byType(Dialog).evaluate().isNotEmpty || find.byType(AlertDialog).evaluate().isNotEmpty) {
         overlay = 'dialog';
@@ -327,6 +359,7 @@ class UiMap {
           find.byWidgetPredicate((w) => w.runtimeType.toString().contains('_PopupMenu')).evaluate().isNotEmpty) {
         overlay = 'menu';
       }
+      if (overlay == null && afterSnap.popup) overlay = 'popup';
       if (overlay != null && to != from) overlay = null; // navigation wins
       edges.add(NavEdge(
         from: from,
@@ -392,6 +425,63 @@ class UiMap {
   static String _fmtScale(double v) {
     final s = v.toStringAsFixed(2);
     return s.endsWith('0') ? s.substring(0, s.length - 1) : s;
+  }
+}
+
+class _Combo {
+  const _Combo({
+    required this.device,
+    required this.theme,
+    required this.platform,
+    required this.textScale,
+    required this.explore,
+  });
+
+  final DeviceSpec device;
+  final String theme;
+  final String platform;
+  final double textScale;
+  final bool explore;
+
+  String get id => '${device.name}__${theme}__$platform${textScale == 1.0 ? '' : '__x$textScale'}';
+}
+
+class _Env {
+  _Env({
+    required this.projectRoot,
+    required this.configPath,
+    required this.config,
+    required this.outDir,
+    required this.mode,
+    required this.explore,
+  });
+
+  final String projectRoot;
+  final String configPath;
+  final UiMapConfig config;
+  final String outDir;
+  final String mode;
+  final bool explore;
+
+  static _Env read({String? outDirOverride}) {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const outEnv = String.fromEnvironment('UI_MAP_OUT');
+    const cfgEnv = String.fromEnvironment('UI_MAP_CONFIG');
+    const mode = String.fromEnvironment('UI_MAP_MODE', defaultValue: 'capture');
+    const exploreEnv = String.fromEnvironment('UI_MAP_EXPLORE');
+    final projectRoot = Directory.current.path;
+    final configPath = cfgEnv.isEmpty ? p.join(projectRoot, 'ui_map.yaml') : cfgEnv;
+    final config = UiMapConfig.load(configPath);
+    final outDir = outDirOverride ?? (outEnv.isEmpty ? p.join(projectRoot, config.outDir) : outEnv);
+    Directory(outDir).createSync(recursive: true);
+    return _Env(
+      projectRoot: projectRoot,
+      configPath: configPath,
+      config: config,
+      outDir: outDir,
+      mode: mode,
+      explore: exploreEnv == 'true' || (exploreEnv.isEmpty && config.explore),
+    );
   }
 }
 

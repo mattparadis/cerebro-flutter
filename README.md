@@ -139,7 +139,16 @@ dart pub add 'dev:ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux
 dart run ui_map init
 ```
 
-Requirements: Flutter ≥ 3.44, `go_router` ≥ 18. Routes with `:params` need
+**Navigator 1.0 apps** (`MaterialApp` with `routes:` and `Navigator.pushNamed`,
+no go_router): run `dart run ui_map init --navigator`. The factory then
+returns only the root widget plus optional `argumentsFor(location)`; route
+names are read from the running `MaterialApp`, each screen is opened with
+`pushNamedAndRemoveUntil` like a deep link, and explore edges come from the
+`ModalRoute` stack. Arguments can also be given in `ui_map.yaml` as
+`routes.<name>.args` (YAML values). Apps without a dark theme should set
+`themes: [light]`.
+
+Requirements: Flutter ≥ 3.44; `go_router` ≥ 18 or `MaterialApp.routes`. Routes with `:params` need
 sample values in `ui_map.yaml`; screens that hit the network or platform
 channels at build time will render their error/empty branch (no HTTP in
 `flutter test`).
@@ -226,8 +235,8 @@ lint:
 
 ## Roadmap
 
-- MCP wrapper, Android emulator capture for native plugins, Navigator 1.0
-  / auto_route support, network image mocking.
+- MCP wrapper, Android emulator capture for native plugins, auto_route
+  support, network image mocking.
 
 ## Licence
 
