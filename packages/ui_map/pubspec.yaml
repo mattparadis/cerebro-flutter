@@ -1,6 +1,7 @@
 name: ui_map
 description: Capture one screenshot per go_router route of a Flutter app headlessly, dump semantics, and build a navigation map for AI agents.
 version: 0.1.0
+repository: https://github.com/mattparadis/flutter-ui-ux-design-skill
 publish_to: none
 
 environment:
