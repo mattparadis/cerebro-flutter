@@ -24,7 +24,9 @@ Future<void> main(List<String> argv) async {
     ..addFlag('force', help: 'Overwrite scaffolded files (init).', negatable: false)
     ..addFlag('help', abbr: 'h', negatable: false)
     ..addOption('config', help: 'Path to ui_map.yaml (default: ./ui_map.yaml).')
-    ..addOption('out', help: 'Output directory (default: out_dir in config, else .ui-map).');
+    ..addOption('out', help: 'Output directory (default: out_dir in config, else .ui-map).')
+    ..addMultiOption('dart-define', abbr: 'D',
+        help: 'Extra --dart-define=KEY=VALUE forwarded to flutter test (e.g. -D UI_PROTO=true).');
   final ArgResults args;
   try {
     args = parser.parse(argv);
@@ -46,13 +48,14 @@ Future<void> main(List<String> argv) async {
   final configPath = p.absolute(args['config'] as String? ?? p.join(root, 'ui_map.yaml'));
   final outDir = p.absolute(args['out'] as String? ?? _outDirFromConfig(configPath) ?? p.join(root, '.ui-map'));
 
+  final defines = (args['dart-define'] as List<String>);
   switch (args.rest.first) {
     case 'init':
       _init(root, configPath, force: args['force'] == true);
     case 'routes':
-      exit(await _routes(root, configPath, outDir));
+      exit(await _routes(root, configPath, outDir, defines));
     case 'capture':
-      exit(await _capture(root, configPath, outDir));
+      exit(await _capture(root, configPath, outDir, defines));
     default:
       stderr.writeln('Unknown command: ${args.rest.first}');
       stderr.writeln(_usage);
@@ -104,7 +107,8 @@ bool _ensureScaffolded(String root) {
   return true;
 }
 
-Future<int> _runFlutterTest(String root, String configPath, String outDir, String mode) async {
+Future<int> _runFlutterTest(
+    String root, String configPath, String outDir, String mode, List<String> defines) async {
   final flutter = Platform.isWindows ? 'flutter.bat' : 'flutter';
   final proc = await Process.start(
     flutter,
@@ -114,6 +118,7 @@ Future<int> _runFlutterTest(String root, String configPath, String outDir, Strin
       '--dart-define=UI_MAP_OUT=$outDir',
       '--dart-define=UI_MAP_CONFIG=$configPath',
       '--dart-define=UI_MAP_MODE=$mode',
+      for (final d in defines) '--dart-define=$d',
       '--reporter=compact',
     ],
     workingDirectory: root,
@@ -123,10 +128,10 @@ Future<int> _runFlutterTest(String root, String configPath, String outDir, Strin
   return proc.exitCode;
 }
 
-Future<int> _routes(String root, String configPath, String outDir) async {
+Future<int> _routes(String root, String configPath, String outDir, List<String> defines) async {
   if (!_ensureScaffolded(root)) return 65;
   Directory(outDir).createSync(recursive: true);
-  final code = await _runFlutterTest(root, configPath, outDir, 'list');
+  final code = await _runFlutterTest(root, configPath, outDir, 'list', defines);
   if (code != 0) return code;
   final routes = jsonDecode(File(p.join(outDir, 'routes.json')).readAsStringSync()) as Map;
   final targets = (routes['targets'] as List).cast<Map>();
@@ -143,14 +148,14 @@ Future<int> _routes(String root, String configPath, String outDir) async {
   return 0;
 }
 
-Future<int> _capture(String root, String configPath, String outDir) async {
+Future<int> _capture(String root, String configPath, String outDir, List<String> defines) async {
   if (!_ensureScaffolded(root)) return 65;
   for (final sub in ['screens', 'semantics', 'results']) {
     final d = Directory(p.join(outDir, sub));
     if (d.existsSync()) d.deleteSync(recursive: true);
   }
   Directory(outDir).createSync(recursive: true);
-  final testCode = await _runFlutterTest(root, configPath, outDir, 'capture');
+  final testCode = await _runFlutterTest(root, configPath, outDir, 'capture', defines);
   final map = MapWriter(outDir, flutterVersion: _flutterVersion()).write();
   final summary = map['summary'] as Map;
   stdout.writeln();

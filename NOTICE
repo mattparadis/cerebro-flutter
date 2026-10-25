@@ -18,5 +18,12 @@ adapted, the source is named in the file that uses it.
 - appllama-skills (https://github.com/Appllama/appllama-skills)
   navigation semantics (push vs replace, sheet vs page, no-back screens).
 
+- Nielsen Norman Group, "10 Usability Heuristics for User Interface
+  Design" (https://www.nngroup.com/articles/ten-usability-heuristics/):
+  the heuristic sweep in skills/audit-screens/references/heuristics.md.
+- impeccable (https://github.com/pbakaus/impeccable, Apache-2.0) and
+  klamben (https://github.com/obiwancenobi/klamben, Apache-2.0):
+  anti-pattern ideas in skills/design-screen/references/anti-patterns.md.
+
 The capture harness follows the image-capture pattern used by
 flutter_test (BSD-3-Clause, Copyright 2014 The Flutter Authors).

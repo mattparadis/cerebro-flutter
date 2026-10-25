@@ -24,6 +24,7 @@ devices:
   - { name: tablet, width: 834, height: 1194, dpr: 2 }
 themes: [dark]
 platforms: [android, ios]
+text_scales: [1.0, 1.3]
 settle_ms: 1000
 export_scale: 1
 min_tap_size: 44
@@ -44,6 +45,7 @@ out_dir: build/ui
     expect(c.devices.last.safeTop, 24);
     expect(c.themes, ['dark']);
     expect(c.platforms, ['android', 'ios']);
+    expect(c.textScales, [1.0, 1.3]);
     expect(c.settleMs, 1000);
     expect(c.exportScale, 1);
     expect(c.minTapSize, 44);

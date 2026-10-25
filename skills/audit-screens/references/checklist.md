@@ -105,3 +105,9 @@ NOTICE.
     `Exception:` in the UI is a finding).
 39. Numbers, dates and currency are localised or at least consistent.
 40. Microcopy in empty / error states is specific to the screen, not generic.
+
+## H. Heuristic sweep
+
+41. After A-G, scan the ten Nielsen heuristics in `heuristics.md` once for
+    the screen and name the heuristic in the "Why it matters" column of any
+    finding it explains (e.g. "H3 user control: no way out").

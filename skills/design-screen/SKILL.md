@@ -1,0 +1,152 @@
+---
+name: design-screen
+description: Design a new Flutter mobile screen (or redesign an existing one) with the right UI/UX theory, Material 3 / Apple HIG rules, the app's own conventions, and a capture-and-check loop. Use when asked to design, create, build, mock up, prototype, propose directions for, or redesign a screen, page, flow, onboarding, paywall, settings, list, detail or form in a Flutter app. Has a prototype mode that produces 2-3 throwaway directions as screenshots before any real code, and a build mode that ships the real screen.
+---
+
+# Design screen
+
+Produce a Flutter screen a senior mobile designer would sign off: correct
+hierarchy, platform idiom, theme tokens only, every state designed, and
+verified from a rendered screenshot, not from the code alone.
+
+Two modes. Pick from the request; when unclear, ask once:
+
+- **prototype**: 2-3 distinct directions with fake data, rendered as PNGs
+  for the person to choose from. Throwaway code behind a flag.
+- **build**: the real screen wired into the app's router, with states,
+  captured and self-audited before it is presented.
+
+The references in `references/` are the theory. Read the ones the task
+needs; do not paste them into the output.
+
+| File | Use it for |
+|---|---|
+| `references/patterns.md` | screen archetypes, states, navigation semantics (push / replace / modal / sheet), forms, onboarding, paywalls, settings |
+| `references/material3.md` | colour roles, type scale, shape, spacing, components, motion, Flutter theme wiring |
+| `references/hig-cupertino.md` | Apple HIG essentials, Cupertino widgets, platform-adaptive strategy |
+| `references/anti-patterns.md` | what makes a screen look AI-generated or break on devices; checked before delivery |
+
+## 1. Brief (always, 5 lines max)
+
+Write these before any code, and show them to the person in the final
+message:
+
+1. **Job**: one sentence, feature + job to be done. "Hard paywall after
+   onboarding, annual default, exit visible."
+2. **Archetype** from `patterns.md` (list, detail, form, onboarding,
+   paywall, settings, empty/first-run, dashboard).
+3. **Platform strategy**: Material everywhere, Cupertino on iOS, or
+   adaptive. Inherit the app's existing choice; never mix on one screen.
+4. **Entry and exit**: where it sits in the navigation map (route path,
+   push / replace / modal), what the back action does, what the primary
+   action leads to.
+5. **States**: default, empty, loading, error, plus any domain states.
+   Each one must be designed, not just handled.
+
+## 2. Inherit the app's conventions
+
+Before designing, look at what exists:
+
+- `.ui-map/MAP.md` and `map.json` if present (run `dart run ui_map capture`
+  if the app is set up for it): open two or three neighbouring screens'
+  PNGs and note gutter, type usage, card style, button hierarchy, AppBar
+  style, bottom navigation.
+- `lib/theme*.dart` or wherever `ThemeData` is built: seed colour, custom
+  `TextTheme`, component themes, `ThemeExtension`s. Use those tokens.
+- The router file: path style, naming, how params and query strings are
+  used, whether screens read `?state=` for scenarios.
+- One existing screen file of the same archetype: copy its structure
+  (Scaffold, padding, list building) so the new screen looks native to
+  the app.
+
+If there is no existing app (greenfield), start from `material3.md`
+defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
+
+## 3. Design decisions (write them down, briefly)
+
+- **Hierarchy**: one primary action (`FilledButton` or FAB), secondary as
+  `TextButton`/`OutlinedButton`, nothing else competes.
+- **Layout**: 4/8 dp grid, 16 dp gutter (24 on standalone marketing/auth
+  screens if the app does that), sections grouped by whitespace before
+  dividers or cards.
+- **Type**: `Theme.of(context).textTheme` roles only, at most three sizes
+  plus labels per screen.
+- **Colour**: `ColorScheme` roles only. Surfaces use the
+  `surfaceContainer*` tiers; text uses `onSurface` / `onSurfaceVariant`;
+  the accent is `primary`. No `Color(0x...)`, no `Colors.*` literals.
+- **Touch**: every target 48 dp (44 pt iOS), 8 dp between targets.
+- **Semantics**: title is a header (`Semantics(header: true)` or AppBar),
+  icon-only buttons have tooltips, images carry labels or are excluded,
+  reading order follows visual order.
+- **Motion**: Material standard/emphasized easing, 200-400 ms; respect
+  `MediaQuery.disableAnimations`.
+- **Copy**: verb-first actions, plain language, empty/error copy specific
+  to the screen.
+
+## 4a. Prototype mode
+
+1. Create `lib/prototypes/<name>_proto.dart` with two or three directions
+   as separate widgets (`<Name>ProtoA`, `ProtoB`, `ProtoC`), each a full
+   `Scaffold`, using the app theme and fake data. Make the directions
+   differ in **structure** (e.g. list vs cards vs grouped sections; sheet vs
+   page; hero image vs text-first), not just in colour.
+2. Register one route guarded by a compile-time flag so the prototypes
+   never ship:
+
+   ```dart
+   const kUiProto = bool.fromEnvironment('UI_PROTO');
+   // in the router's top-level routes:
+   if (kUiProto)
+     GoRoute(
+       path: '/__proto/<name>',
+       builder: (c, s) => switch (s.uri.queryParameters['v']) {
+         'b' => const <Name>ProtoB(),
+         'c' => const <Name>ProtoC(),
+         _ => const <Name>ProtoA(),
+       },
+     ),
+   ```
+
+3. Add to `ui_map.yaml`:
+
+   ```yaml
+   routes:
+     "/__proto/<name>": { variants: ["?v=b", "?v=c"] }
+   ```
+
+4. Capture with the flag: `dart run ui_map capture -D UI_PROTO=true`.
+   Open the PNGs yourself and reject any direction that breaks the rules
+   in step 3 before showing it.
+5. Present: for each direction, the PNG path(s) (light and dark), two
+   lines on the idea and its trade-off. Recommend one. Ask the person to
+   choose. Stop there.
+6. On a choice: build mode for that direction, then delete
+   `lib/prototypes/<name>_proto.dart`, the guarded route and the yaml
+   entry. Prototypes do not linger.
+
+## 4b. Build mode
+
+1. Write the screen under the app's convention (`lib/screens/`,
+   `lib/features/<x>/presentation/`, ...). One widget per state or a
+   small state switch inside the screen; never leave a state unhandled.
+2. Wire the route in the router with the semantics decided in the brief
+   (`pageBuilder` with `fullscreenDialog: true` for modal creation flows,
+   `context.push` for details, `context.go` for replacing flows). Expose
+   states by query parameter when the data layer allows it
+   (`?state=empty|loading|error`), so they can be captured.
+3. Add the route (and its `params` / `variants`) to `ui_map.yaml`, run
+   `dart run ui_map capture`, and look at every PNG of the new screen in
+   light and dark (and `__x1.3` if `text_scales` includes 1.3).
+4. Self-audit against the `audit-screens` checklist if that skill is
+   installed, otherwise against `anti-patterns.md` and step 3 above.
+   Fix anything of severity 3-4 (touch target, contrast, missing state,
+   no way back, overflow) before presenting. Report `exceptions` from
+   `map.json` as fixed, not as known issues.
+5. `flutter analyze` clean; existing tests still pass.
+
+## 5. Deliver
+
+Final message: the 5-line brief, files created or changed, the route and
+how to open it, the PNG paths, what was verified in the capture, and what
+cannot be verified headlessly (haptics, keyboard behaviour, real network,
+animations) and should be checked on a device. No code in the message.

@@ -63,6 +63,12 @@ light and dark variants side by side.
    tappable parent (a Switch inside a ListTile) and the real hit area is fine.
 4. Go through `references/checklist.md` item by item. Mark each
    `present`, `partial`, `missing`, `n/a` or `can't tell`. There is no score.
+   Then do the heuristic sweep in `references/heuristics.md` (Nielsen's 10)
+   and name the heuristic in the "Why it matters" of the findings it
+   explains.
+   For platform specifics (Material 3 tokens, Apple HIG, Cupertino
+   mapping) consult the `design-screen` skill's `references/` if it is
+   installed alongside this one.
 5. Severity per finding, Nielsen's scale:
    - 4 catastrophic: blocks a task or violates platform rules (no way back,
      unreadable text, overflow hiding content);
@@ -80,6 +86,9 @@ Rules of evidence:
   device size would settle it.
 - Quote the evidence: the location, the theme, coordinates or the semantics
   label.
+- Large-text captures (`__x1.3` ids, when `text_scales` is configured)
+  are evidence for item 13: report overflow, clipping or truncation that
+  appears only at the larger scale as severity 2-3.
 - A dark-mode finding must be checked against the light screenshot: report
   "not adapted" only when the light and dark PNGs look the same where they
   should differ.

@@ -56,6 +56,7 @@ class UiMapConfig {
     this.devices = const [DeviceSpec(name: 'phone', width: 393, height: 852, dpr: 3)],
     this.themes = const ['light', 'dark'],
     this.platforms = const ['android'],
+    this.textScales = const [1.0],
     this.settleMs = 600,
     this.exportScale = 2,
     this.minTapSize = 48,
@@ -68,6 +69,10 @@ class UiMapConfig {
   final List<DeviceSpec> devices;
   final List<String> themes;
   final List<String> platforms;
+
+  /// Text scale factors to capture (1.0 = default). Ids get a `__x1.3`
+  /// suffix for scales other than 1.0.
+  final List<double> textScales;
   final int settleMs;
   final double exportScale;
   final double minTapSize;
@@ -131,6 +136,7 @@ class UiMapConfig {
       devices: devices == null || devices.isEmpty ? d.devices : devices,
       themes: _strings(m['themes']) ?? d.themes,
       platforms: _strings(m['platforms']) ?? d.platforms,
+      textScales: (m['text_scales'] as List?)?.map((e) => (e as num).toDouble()).toList() ?? d.textScales,
       settleMs: (m['settle_ms'] as num?)?.toInt() ?? d.settleMs,
       exportScale: (m['export_scale'] as num?)?.toDouble() ?? d.exportScale,
       minTapSize: (m['min_tap_size'] as num?)?.toDouble() ?? d.minTapSize,
@@ -145,6 +151,7 @@ class UiMapConfig {
         'devices': devices.map((d) => d.toJson()).toList(),
         'themes': themes,
         'platforms': platforms,
+        'text_scales': textScales,
         'settle_ms': settleMs,
         'export_scale': exportScale,
         'min_tap_size': minTapSize,

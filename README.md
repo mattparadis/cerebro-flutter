@@ -7,15 +7,21 @@ a small Dart tool that captures one screenshot per `go_router` route
 touch targets below the minimum, and builds a navigation map the agent can
 read.
 
-Status: **v0.1, vertical slice**. One skill (`audit-screens`), one tool
-(`ui_map`), one demo app. Works on Linux, macOS and Windows hosts with the
-Flutter SDK only.
+Status: **v0.1**. Two skills, one tool, one demo app. Works on Linux,
+macOS and Windows hosts with the Flutter SDK only.
 
 ```
-skills/audit-screens/     the skill (SKILL.md + checklist + report template)
+skills/audit-screens/     audit existing screens: checklist (40 items), Nielsen heuristics, report template
+skills/design-screen/     design new screens: prototype mode (2-3 directions as PNGs) and build mode,
+                          with Material 3, Apple HIG / Cupertino, patterns and anti-pattern references
 packages/ui_map/          Dart package: `dart run ui_map init | routes | capture`
 example/demo_app/         Flutter app with planted design defects, used as fixture
 ```
+
+| Skill | Ask for | What it does |
+|---|---|---|
+| `audit-screens` | "audit / review / critique the screens of this app" | captures (or reuses) the map, reads every PNG and semantics dump, applies the checklist and Nielsen's heuristics, writes `.ui-map/audit/<screen>.md` + `SUMMARY.md` with the highest-leverage change |
+| `design-screen` | "design / prototype / redesign the X screen" | writes a 5-line brief, inherits the app's conventions from the map and theme, then either renders 2-3 prototype directions behind a `UI_PROTO` flag for you to pick, or builds the real screen with all states, captures it and self-audits before presenting |
 
 ## How it works
 
@@ -41,6 +47,9 @@ example/demo_app/         Flutter app with planted design defects, used as fixtu
    `.ui-map/audit/<screen>.md` plus `SUMMARY.md` with the single
    highest-leverage change.
 
+Large-text variants (`text_scales: [1.0, 1.3]`) and prototype routes
+(`dart run ui_map capture -D UI_PROTO=true`) are captured the same way.
+
 Screen **states** are addressed as locations: a list screen that reads
 `?state=empty|loading|error` from `GoRouterState.uri.queryParameters` can
 be captured in every state by listing `variants` in `ui_map.yaml`. No
@@ -50,8 +59,9 @@ test-only wiring needed.
 
 ```bash
 cd example/demo_app
-dart run ui_map routes     # 12 locations, incl. /notes?state=empty|loading|error
-dart run ui_map capture    # 24 PNGs (12 locations × light/dark) in ~20 s
+dart run ui_map routes                     # 12 locations, incl. /notes?state=empty|loading|error
+dart run ui_map capture                    # 48 PNGs (12 locations × light/dark × 1.0/1.3 text) in ~30 s
+dart run ui_map capture -D UI_PROTO=true   # + the two prototype directions under /__proto/note-detail
 ```
 
 The generated `MAP.md` starts with the route tree:
@@ -122,6 +132,7 @@ devices:
   - { name: phone, width: 393, height: 852, dpr: 3, safe_area: { top: 24, bottom: 24 } }
 themes: [light, dark]
 platforms: [android]        # android | ios
+text_scales: [1.0, 1.3]     # large-text variants get an __x1.3 id suffix
 settle_ms: 600              # fixed pumps; infinite spinners are fine
 export_scale: 2             # PNG = logical size × 2
 min_tap_size: 48
@@ -136,11 +147,11 @@ out_dir: .ui-map
 
 ## Roadmap
 
-- `design-screen` skill with platform references (Material 3 Expressive,
-  HIG / Cupertino mapping) and a code-rule detector.
+- Deterministic code-rule detector (hardcoded colours, missing SafeArea,
+  small targets in source) and a contrast measurement in `ui_map`.
 - Dynamic navigation edges (NavigatorObserver), diff between captures,
   pre-commit / CI hook, MCP wrapper, Android emulator capture for native
-  plugins.
+  plugins, Navigator 1.0 / auto_route support.
 
 ## Licence
 

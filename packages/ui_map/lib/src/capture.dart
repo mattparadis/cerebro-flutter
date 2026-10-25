@@ -70,21 +70,25 @@ class UiMap {
       for (final device in config.devices) {
         for (final theme in config.themes) {
           for (final platform in config.platforms) {
-            final id = '${slugForLocation(t.location)}__${device.name}__${theme}__$platform';
-            testWidgets('ui_map $id', (tester) async {
-              await _captureOne(
-                tester,
-                id: id,
-                target: t,
-                device: device,
-                theme: theme,
-                platform: platform,
-                config: config,
-                outDir: outDir,
-                buildRouter: buildRouter,
-                buildApp: buildApp,
-              );
-            });
+            for (final scale in config.textScales) {
+              final suffix = scale == 1.0 ? '' : '__x${_fmtScale(scale)}';
+              final id = '${slugForLocation(t.location)}__${device.name}__${theme}__$platform$suffix';
+              testWidgets('ui_map $id', (tester) async {
+                await _captureOne(
+                  tester,
+                  id: id,
+                  target: t,
+                  device: device,
+                  theme: theme,
+                  platform: platform,
+                  textScale: scale,
+                  config: config,
+                  outDir: outDir,
+                  buildRouter: buildRouter,
+                  buildApp: buildApp,
+                );
+              });
+            }
           }
         }
       }
@@ -98,6 +102,7 @@ class UiMap {
     required DeviceSpec device,
     required String theme,
     required String platform,
+    required double textScale,
     required UiMapConfig config,
     required String outDir,
     required RouterBuilder buildRouter,
@@ -112,6 +117,7 @@ class UiMap {
       'device': device.name,
       'theme': theme,
       'platform': platform,
+      'text_scale': textScale,
       'status': 'ok',
     };
     final screensDir = Directory(p.join(outDir, 'screens'))..createSync(recursive: true);
@@ -128,6 +134,10 @@ class UiMap {
     tester.view.viewPadding = insets;
     addTearDown(tester.view.reset);
     result['safe_area'] = {'top': device.safeTop, 'bottom': device.safeBottom};
+    if (textScale != 1.0) {
+      tester.platformDispatcher.textScaleFactorTestValue = textScale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
 
     final previousPlatform = debugDefaultTargetPlatformOverride;
     debugDefaultTargetPlatformOverride = switch (platform) {
@@ -265,6 +275,11 @@ class UiMap {
   }
 
   static String _firstLine(String s) => s.split('\n').first.trim();
+
+  static String _fmtScale(double v) {
+    final s = v.toStringAsFixed(2);
+    return s.endsWith('0') ? s.substring(0, s.length - 1) : s;
+  }
 }
 
 /// A tappable semantics node with its rect in logical pixels.

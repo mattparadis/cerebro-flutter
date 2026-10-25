@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'data/notes_repository.dart';
+import 'prototypes/note_detail_proto.dart';
 import 'screens/about_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/note_detail_screen.dart';
@@ -12,6 +13,10 @@ import 'screens/paywall_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/shell_scaffold.dart';
+
+/// Compile-time flag that exposes prototype routes (`/__proto/...`) to the
+/// ui_map capture: `dart run ui_map capture -D UI_PROTO=true`.
+const kUiProto = bool.fromEnvironment('UI_PROTO');
 
 /// Builds the app router. [initialLocation] exists so tests and the ui_map
 /// harness can open the app directly on any screen.
@@ -34,6 +39,15 @@ GoRouter buildRouter({String initialLocation = '/'}) {
         name: 'paywall',
         builder: (context, state) => const PaywallScreen(),
       ),
+      if (kUiProto)
+        GoRoute(
+          path: '/__proto/note-detail',
+          name: 'protoNoteDetail',
+          builder: (context, state) => switch (state.uri.queryParameters['v']) {
+            'b' => const NoteDetailProtoB(),
+            _ => const NoteDetailProtoA(),
+          },
+        ),
       GoRoute(
         path: '/notes/new',
         name: 'noteNew',
