@@ -107,6 +107,11 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
      ),
    ```
 
+   If the final screen will live inside a shell (tabs), register the
+   prototype route as a child of that branch (e.g. under `/settings`)
+   instead of top-level, so the capture shows the real AppBar back button
+   and bottom navigation around it.
+
 3. Add to `ui_map.yaml`:
 
    ```yaml
