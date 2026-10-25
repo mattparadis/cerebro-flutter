@@ -209,11 +209,7 @@ class UiMap {
             child: _withInsetBands(app, top: device.safeTop, bottom: device.safeBottom),
           );
       await driver.open(tester, target.location, themeMode, wrap);
-      const step = Duration(milliseconds: 100);
-      final steps = (config.settleMs / 100).ceil().clamp(1, 600);
-      for (var i = 0; i < steps; i++) {
-        await tester.pump(step);
-      }
+      await _settle(tester, config);
 
       // Layout/paint exceptions (e.g. RenderFlex overflow) are findings, not
       // reasons to abort: collect them and keep going.
@@ -326,9 +322,7 @@ class UiMap {
     for (final t in candidates) {
       final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
       await driver.open(tester, target.location, themeMode, wrap);
-      for (var i = 0; i < 6; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      await _settle(tester, config);
       while (tester.takeException() != null) {}
       final before = driver.snapshot(tester);
       final depthBefore = before.depth;
@@ -409,6 +403,24 @@ class UiMap {
           ),
       ],
     );
+  }
+
+  /// Fixed pumps (never pumpAndSettle), optionally letting real async I/O
+  /// complete in between so network-backed screens settle.
+  static Future<void> _settle(WidgetTester tester, UiMapConfig config) async {
+    const step = Duration(milliseconds: 100);
+    final steps = (config.settleMs / 100).ceil().clamp(1, 600);
+    for (var i = 0; i < steps; i++) {
+      await tester.pump(step);
+    }
+    if (config.realAsyncMs > 0) {
+      for (var round = 0; round < 2; round++) {
+        await tester.runAsync(() => Future<void>.delayed(Duration(milliseconds: config.realAsyncMs)));
+        for (var i = 0; i < steps; i++) {
+          await tester.pump(step);
+        }
+      }
+    }
   }
 
   static Map<String, List<String>> _resolveFonts(Map<String, List<String>> fonts, String root) => {

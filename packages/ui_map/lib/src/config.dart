@@ -63,6 +63,7 @@ class UiMapConfig {
     this.platforms = const ['android'],
     this.textScales = const [1.0],
     this.settleMs = 600,
+    this.realAsyncMs = 0,
     this.exportScale = 2,
     this.minTapSize = 48,
     this.routes = const {},
@@ -83,6 +84,13 @@ class UiMapConfig {
   /// suffix for scales other than 1.0.
   final List<double> textScales;
   final int settleMs;
+
+  /// When > 0, after the settle pumps the harness waits this many real
+  /// milliseconds inside `tester.runAsync` and pumps again, so that real
+  /// I/O (HTTP, which flutter_test answers with 400, file reads) can
+  /// complete and screens reach their loaded/error state instead of
+  /// spinning forever in the fake-async zone.
+  final int realAsyncMs;
   final double exportScale;
   final double minTapSize;
   final Map<String, RouteOptions> routes;
@@ -156,6 +164,7 @@ class UiMapConfig {
       platforms: _strings(m['platforms']) ?? d.platforms,
       textScales: (m['text_scales'] as List?)?.map((e) => (e as num).toDouble()).toList() ?? d.textScales,
       settleMs: (m['settle_ms'] as num?)?.toInt() ?? d.settleMs,
+      realAsyncMs: (m['real_async_ms'] as num?)?.toInt() ?? d.realAsyncMs,
       exportScale: (m['export_scale'] as num?)?.toDouble() ?? d.exportScale,
       minTapSize: (m['min_tap_size'] as num?)?.toDouble() ?? d.minTapSize,
       routes: routes,
@@ -177,6 +186,7 @@ class UiMapConfig {
         'platforms': platforms,
         'text_scales': textScales,
         'settle_ms': settleMs,
+        'real_async_ms': realAsyncMs,
         'export_scale': exportScale,
         'min_tap_size': minTapSize,
         'routes': {

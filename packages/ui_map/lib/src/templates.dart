@@ -45,6 +45,7 @@ themes: [light, dark]        # light | dark
 platforms: [android]         # android | ios (sets defaultTargetPlatform)
 text_scales: [1.0]           # add 1.3 to also capture large-text variants (ids get __x1.3)
 settle_ms: 600               # fixed pumps after build; never pumpAndSettle
+real_async_ms: 0             # >0: also wait real time so HTTP (answered 400 in tests) / file I/O settles
 export_scale: 2
 min_tap_size: 48             # dp; smaller tappable semantics nodes are reported
 
