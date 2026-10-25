@@ -135,7 +135,7 @@ npx skills add mattparadis/flutter-ui-ux-design-skill --skill audit-screens
 npx skills add mattparadis/flutter-ui-ux-design-skill --skill design-screen
 
 # the tool, as a dev dependency (SSH form while the repo is private)
-dart pub add --dev 'ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux-design-skill.git","path":"packages/ui_map"}}'
+dart pub add 'dev:ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux-design-skill.git","path":"packages/ui_map"}}'
 dart run ui_map init
 ```
 
