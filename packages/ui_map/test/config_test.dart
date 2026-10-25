@@ -13,6 +13,7 @@ void main() {
     expect(c.exportScale, 2);
     expect(c.minTapSize, 48);
     expect(c.outDir, '.ui-map');
+    expect(c.lintExclude, isNull);
   });
 
   test('parses yaml', () {
@@ -36,6 +37,9 @@ exclude: ["/secret"]
 fonts:
   Inter: [assets/fonts/Inter.ttf]
 out_dir: build/ui
+lint:
+  exclude: ["lib/gen/**"]
+  rules: { no-safe-area: false }
 ''');
     final c = UiMapConfig.load(f.path);
     expect(c.devices.map((d) => d.name), ['small', 'tablet']);
@@ -55,6 +59,8 @@ out_dir: build/ui
     expect(c.exclude, ['/secret']);
     expect(c.fonts, {'Inter': ['assets/fonts/Inter.ttf']});
     expect(c.outDir, 'build/ui');
+    expect(c.lintExclude, ['lib/gen/**']);
+    expect(c.lintRules, {'no-safe-area': false});
     expect(c.toJson()['routes'], isA<Map>());
   });
 }

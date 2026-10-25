@@ -147,7 +147,8 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
    Fix anything of severity 3-4 (touch target, contrast, missing state,
    no way back, overflow) before presenting. Report `exceptions` from
    `map.json` as fixed, not as known issues.
-5. `flutter analyze` clean; existing tests still pass.
+5. `dart run ui_map lint` reports no `error` or `warning` in the new
+   files; `flutter analyze` clean; existing tests still pass.
 
 ## 5. Deliver
 

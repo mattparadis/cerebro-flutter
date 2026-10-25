@@ -59,7 +59,13 @@ light and dark variants side by side.
 1. Read the PNGs (they are images; look at them).
 2. Skim the semantics file: unlabeled buttons, images without labels, heading
    structure, reading order, duplicated labels.
-3. Take these as confirmed findings without further checking:
+3. Run `dart run ui_map lint` and read `.ui-map/lint.json`: every
+   `error` or `warning` there is a confirmed finding with a `file:line`
+   (hardcoded colours, literal font sizes, empty handlers, small icon
+   buttons, deprecated `WillPopScope`, `Platform.isIOS` in UI code).
+   Attach each to the screen whose file it lives in; `info` items are
+   hints to verify on the screenshot, not findings by themselves.
+4. Take these as confirmed findings without further checking:
    - every entry in `tappables_below_min` (touch target below the minimum,
      coordinates and size are given);
    - every entry in `exceptions` (RenderFlex overflow, unbounded height, ...);
@@ -67,7 +73,7 @@ light and dark variants side by side.
      usually a missing dependency or side effect in the factory).
    Do **not** report `tappables_below_min_nested`: those sit inside a larger
    tappable parent (a Switch inside a ListTile) and the real hit area is fine.
-4. Go through `references/checklist.md` item by item. Mark each
+5. Go through `references/checklist.md` item by item. Mark each
    `present`, `partial`, `missing`, `n/a` or `can't tell`. There is no score.
    Then do the heuristic sweep in `references/heuristics.md` (Nielsen's 10)
    and name the heuristic in the "Why it matters" of the findings it
@@ -75,7 +81,7 @@ light and dark variants side by side.
    For platform specifics (Material 3 tokens, Apple HIG, Cupertino
    mapping) consult the `design-screen` skill's `references/` if it is
    installed alongside this one.
-5. Severity per finding, Nielsen's scale:
+6. Severity per finding, Nielsen's scale:
    - 4 catastrophic: blocks a task or violates platform rules (no way back,
      unreadable text, overflow hiding content);
    - 3 major: hurts most users (touch target < 48 dp, contrast < 4.5:1,

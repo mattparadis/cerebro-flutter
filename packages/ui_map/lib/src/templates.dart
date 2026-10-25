@@ -62,4 +62,10 @@ exclude: []
 fonts: {}
 
 out_dir: .ui-map
+
+# `dart run ui_map lint`: regex rules for design defects the analyzer does
+# not know about. Globs are skipped for the colour/font rules.
+lint:
+  exclude: ["**/*.g.dart", "**/*.freezed.dart", "**/theme.dart", "**/theme/**"]
+  rules: {}            # e.g. { no-safe-area: false }
 ''';

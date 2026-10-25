@@ -63,7 +63,8 @@ breaks on real devices. Ideas adapted from impeccable / klamben
 1. Open the light and dark PNGs: do surfaces, text and borders all change?
 2. Any `exceptions` in `map.json` for the screen? Fix, do not explain.
 3. Any `tappables_below_min`? Fix.
-4. Grep the new file for `Color(0x`, `Colors.`, `fontSize:`, `() {}`.
+4. Run `dart run ui_map lint` (or grep the new file for `Color(0x`,
+   `Colors.`, `fontSize:`, `() {}`).
 5. Is there an empty, loading and error design, each reachable by URL?
 6. Is the way back obvious, and is the primary action the only filled
    button?

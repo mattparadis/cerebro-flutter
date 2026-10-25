@@ -64,6 +64,8 @@ class UiMapConfig {
     this.exclude = const [],
     this.fonts = const {},
     this.outDir = '.ui-map',
+    this.lintExclude,
+    this.lintRules = const {},
   });
 
   final List<DeviceSpec> devices;
@@ -82,6 +84,10 @@ class UiMapConfig {
   /// family -> font file paths (absolute, project-relative, or asset keys).
   final Map<String, List<String>> fonts;
   final String outDir;
+
+  /// `lint.exclude` globs (null = lint defaults) and `lint.rules` id -> bool.
+  final List<String>? lintExclude;
+  final Map<String, bool> lintRules;
 
   static UiMapConfig load(String path) {
     final file = File(path);
@@ -144,6 +150,10 @@ class UiMapConfig {
       exclude: _strings(m['exclude']) ?? const [],
       fonts: fonts,
       outDir: '${m['out_dir'] ?? d.outDir}',
+      lintExclude: _strings((m['lint'] as Map?)?['exclude']),
+      lintRules: {
+        for (final e in (((m['lint'] as Map?)?['rules'] as Map?) ?? {}).entries) '${e.key}': e.value == true,
+      },
     );
   }
 
@@ -166,6 +176,7 @@ class UiMapConfig {
         'exclude': exclude,
         'fonts': fonts,
         'out_dir': outDir,
+        'lint': {'exclude': lintExclude, 'rules': lintRules},
       };
 
   static List<String>? _strings(Object? v) =>

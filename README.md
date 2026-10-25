@@ -163,6 +163,23 @@ When a change is intentional, run `dart run ui_map baseline` again and
 commit the new baseline with the code; the agent reading `DIFF.md` can
 tell you which screens to look at before you do.
 
+## Deterministic code rules: `ui_map lint`
+
+```bash
+dart run ui_map lint            # .ui-map/lint.json + LINT.md, exit 1 on errors
+dart run ui_map lint --lint-fail-on warning
+```
+
+Regex rules for the design defects the Dart analyzer does not know about,
+each with `file:line`: `hardcoded-color`, `literal-font-size`,
+`empty-handler`, `small-icon-button`, `deprecated-will-pop-scope`,
+`platform-io-check`, `no-safe-area`, `network-image-no-error-builder`,
+`gesture-without-semantics`, `pump-and-settle` (tests). Theme files and
+generated code are excluded by default; tune `lint.exclude` and
+`lint.rules` in `ui_map.yaml`. `check` runs capture, diff and lint
+together. The audit skill treats lint errors and warnings as confirmed
+findings.
+
 ## `ui_map.yaml`
 
 ```yaml
@@ -181,6 +198,9 @@ routes:
 exclude: []
 fonts: {}                   # family -> font files, for custom fonts
 out_dir: .ui-map
+lint:
+  exclude: ["**/*.g.dart", "**/theme.dart", "**/theme/**"]
+  rules: { no-safe-area: false }   # disable a rule
 ```
 
 ## Roadmap

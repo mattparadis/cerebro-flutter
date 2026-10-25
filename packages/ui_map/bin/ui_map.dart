@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
+import 'package:ui_map/src/config.dart';
 import 'package:ui_map/src/diff.dart';
+import 'package:ui_map/src/lint.dart';
 import 'package:ui_map/src/map_writer.dart';
 import 'package:ui_map/src/templates.dart';
 
@@ -18,7 +20,8 @@ Commands:
   capture   Capture every screen, then write .ui-map/map.json and MAP.md.
   baseline  Save the current capture as the baseline (.ui-map/baseline/) for diff.
   diff      Compare the current capture with the baseline; write diff.json and DIFF.md.
-  check     capture + diff in one step (for pre-commit hooks and CI).
+  lint      Scan lib/ for design-rule violations (hardcoded colours, small targets, ...).
+  check     capture + diff + lint in one step (for pre-commit hooks and CI).
 
 Run from the root of the Flutter app (where pubspec.yaml is).
 ''';
@@ -36,7 +39,11 @@ Future<void> main(List<String> argv) async {
         allowed: ['none', 'regression', 'any'],
         defaultsTo: 'regression',
         help: 'diff/check exit code 1 on: regressions (errors, new layout exceptions, new small '
-            'targets), any change, or never.');
+            'targets), any change, or never.')
+    ..addOption('lint-fail-on',
+        allowed: ['none', 'error', 'warning', 'info'],
+        defaultsTo: 'error',
+        help: 'lint/check exit code 1 when findings of this severity or higher exist.');
   final ArgResults args;
   try {
     args = parser.parse(argv);
@@ -70,10 +77,14 @@ Future<void> main(List<String> argv) async {
       exit(_baseline(root, outDir));
     case 'diff':
       exit(_diff(root, outDir, args['baseline'] as String?, args['fail-on'] as String));
+    case 'lint':
+      exit(_lint(root, configPath, outDir, args['lint-fail-on'] as String));
     case 'check':
       final code = await _capture(root, configPath, outDir, defines);
       if (code != 0) exit(code);
-      exit(_diff(root, outDir, args['baseline'] as String?, args['fail-on'] as String));
+      final diffCode = _diff(root, outDir, args['baseline'] as String?, args['fail-on'] as String);
+      final lintCode = _lint(root, configPath, outDir, args['lint-fail-on'] as String);
+      exit(diffCode != 0 ? diffCode : lintCode);
     default:
       stderr.writeln('Unknown command: ${args.rest.first}');
       stderr.writeln(_usage);
@@ -242,6 +253,33 @@ int _diff(String root, String outDir, String? baselineArg, String failOn) {
     'regression' => regressions > 0 ? 1 : 0,
     _ => 0,
   };
+}
+
+int _lint(String root, String configPath, String outDir, String failOn) {
+  final config = UiMapConfig.load(configPath);
+  final options = LintOptions(
+    excludeGlobs: config.lintExclude ?? const LintOptions().excludeGlobs,
+    rules: config.lintRules,
+  );
+  final findings = lintProject(root, options: options);
+  Directory(outDir).createSync(recursive: true);
+  File(p.join(outDir, 'lint.json')).writeAsStringSync(const JsonEncoder.withIndent('  ')
+      .convert({'generated_at': DateTime.now().toUtc().toIso8601String(), 'findings': findings.map((f) => f.toJson()).toList()}));
+  File(p.join(outDir, 'LINT.md')).writeAsStringSync(renderLintMarkdown(findings));
+  final counts = <String, int>{};
+  for (final f in findings) {
+    counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+  }
+  stdout.writeln('ui_map lint: ${findings.length} findings · ${counts['error'] ?? 0} errors · '
+      '${counts['warning'] ?? 0} warnings · ${counts['info'] ?? 0} info.');
+  for (final f in findings.where((f) => f.severity != 'info').take(15)) {
+    stdout.writeln('  ${f.severity == 'error' ? '!!' : ' !'} ${f.file}:${f.line}  ${f.rule}  ${f.snippet}');
+  }
+  stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'LINT.md'), from: root)} written.');
+  const rank = {'error': 3, 'warning': 2, 'info': 1, 'none': 0};
+  final threshold = rank[failOn]!;
+  if (threshold == 0) return 0;
+  return findings.any((f) => rank[f.severity]! >= threshold) ? 1 : 0;
 }
 
 String? _flutterVersion() {
