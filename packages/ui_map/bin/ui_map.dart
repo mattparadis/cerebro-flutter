@@ -188,6 +188,11 @@ Future<int> _capture(String root, String configPath, String outDir, List<String>
     final d = Directory(p.join(outDir, sub));
     if (d.existsSync()) d.deleteSync(recursive: true);
   }
+  // A diff from a previous capture would contradict the new map.json.
+  for (final stale in ['diff.json', 'DIFF.md']) {
+    final f = File(p.join(outDir, stale));
+    if (f.existsSync()) f.deleteSync();
+  }
   Directory(outDir).createSync(recursive: true);
   final testCode = await _runFlutterTest(root, configPath, outDir, 'capture', defines);
   final map = MapWriter(outDir, flutterVersion: _flutterVersion()).write();
