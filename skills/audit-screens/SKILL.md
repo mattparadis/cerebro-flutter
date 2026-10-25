@@ -88,7 +88,11 @@ light and dark variants side by side.
      3.0 threshold; quote `ratio`, `fg`, `bg`);
    - every entry in `exceptions` (RenderFlex overflow, unbounded height, ...);
    - screens with `status: error` (the route could not render in a test;
-     usually a missing dependency or side effect in the factory).
+     usually a missing dependency or side effect in the factory);
+   - `redirected_to`: the screen sent the user elsewhere on open (an auth
+     guard, a missing-argument fallback). Audit the screen it landed on
+     only once, and report the redirect itself if it loses context
+     (e.g. a deep link to a booking that lands on the home screen).
    Do **not** report `tappables_below_min_nested`: those sit inside a larger
    tappable parent (a Switch inside a ListTile) and the real hit area is fine.
 5. Go through `references/checklist.md` item by item. Mark each

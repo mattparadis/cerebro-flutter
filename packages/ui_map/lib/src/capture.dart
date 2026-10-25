@@ -210,6 +210,10 @@ class UiMap {
           );
       await driver.open(tester, target.location, themeMode, wrap);
       await _settle(tester, config);
+      final landed = driver.snapshot(tester).location;
+      if (landed != target.location && landed != target.location.split('?').first) {
+        result['redirected_to'] = landed;
+      }
 
       // Layout/paint exceptions (e.g. RenderFlex overflow) are findings, not
       // reasons to abort: collect them and keep going.

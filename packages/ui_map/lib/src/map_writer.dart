@@ -171,6 +171,7 @@ class MapWriter {
         if (small.isNotEmpty) notes.add('${small.length} small tap target(s)');
         final lowc = (s['low_contrast'] as List?) ?? const [];
         if (lowc.isNotEmpty) notes.add('${lowc.length} low-contrast text(s)');
+        if (s['redirected_to'] != null) notes.add('redirects to `${s['redirected_to']}`');
         if (s['error'] != null) notes.add('${s['error']}');
         final png = s['png'];
         final img = png == null ? '' : '<img src="$png" width="120" alt="${s['id']}">';

@@ -105,9 +105,11 @@ class NavigatorDriver implements ScreenDriver {
     final nav = tester.state<NavigatorState>(find.byType(Navigator).first);
     final routeName = location.split('?').first;
     final args = argumentsFor?.call(location) ?? configArgs[location] ?? configArgs[routeName];
-    // Replace the initial route so the capture shows [location] alone on
-    // the stack, like a deep link would.
-    nav.pushNamedAndRemoveUntil(location, (_) => false, arguments: args);
+    // Push on top of the app's initial route, as the app itself would:
+    // screens that pop themselves (auth guards) then land on the initial
+    // route instead of crashing on an empty stack. The capture records a
+    // `redirected_to` when the final location differs from the target.
+    nav.pushNamed(location, arguments: args);
   }
 
   @override
