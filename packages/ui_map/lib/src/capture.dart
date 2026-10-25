@@ -242,6 +242,7 @@ class UiMap {
         final report = measureTextContrast(tester, rgba!, imageW, imageH, scale: config.exportScale);
         result['text_nodes_checked'] = report.checked;
         result['low_contrast'] = report.low.map((e) => e.toJson()).toList();
+        result['low_contrast_icons'] = report.lowIcons.map((e) => e.toJson()).toList();
       }
       result['png'] = p.relative(pngPath, from: outDir);
       result['sha256_png'] = sha256.convert(File(pngPath).readAsBytesSync()).toString();
@@ -317,7 +318,10 @@ class UiMap {
     required AppWrap wrap,
   }) async {
     final edges = <NavEdge>[];
-    final candidates = tappables.where((t) => !t.nestedInLargerTarget).take(config.exploreMaxTaps).toList();
+    final candidates = tappables
+        .where((t) => !t.nestedInLargerTarget && !t.fullScreen)
+        .take(config.exploreMaxTaps)
+        .toList();
     var unlabeled = 0;
     for (final t in candidates) {
       final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
@@ -533,10 +537,13 @@ class LowContrast {
 }
 
 class ContrastReport {
-  const ContrastReport({required this.checked, required this.low});
+  const ContrastReport({required this.checked, required this.low, this.lowIcons = const []});
 
   final int checked;
   final List<LowContrast> low;
+
+  /// Icon glyphs (private-use codepoints) below 3:1.
+  final List<LowContrast> lowIcons;
 }
 
 /// Measures WCAG contrast for every rendered paragraph: the text colour is
@@ -551,6 +558,7 @@ ContrastReport measureTextContrast(
 }) {
   var checked = 0;
   final low = <LowContrast>[];
+  final icons = <LowContrast>[];
   final seen = <String>{};
   for (final element in find.byType(RichText).evaluate()) {
     final ro = element.renderObject;
@@ -558,6 +566,7 @@ ContrastReport measureTextContrast(
     final span = ro.text;
     final plain = span.toPlainText().trim();
     if (plain.isEmpty) continue;
+    final isIcon = plain.runes.length == 1 && _isPrivateUse(plain.runes.first);
     final style = _firstStyle(span);
     final color = style?.color;
     if (color == null) continue;
@@ -576,7 +585,22 @@ ContrastReport measureTextContrast(
     final ratio = contrastRatio(fg, bg);
     final fontSize = style?.fontSize ?? 14;
     final bold = (style?.fontWeight?.value ?? 400) >= FontWeight.w700.value;
-    final required = requiredContrast(fontSize: fontSize, bold: bold);
+    // Icons are non-text UI: WCAG 1.4.11 asks 3:1.
+    final required = isIcon ? 3.0 : requiredContrast(fontSize: fontSize, bold: bold);
+    if (isIcon) {
+      if (ratio < required) {
+        icons.add(LowContrast(
+          text: 'icon U+${plain.runes.first.toRadixString(16).toUpperCase()}',
+          ratio: ratio,
+          required: required,
+          foreground: fg,
+          background: bg,
+          fontSize: fontSize,
+          rect: rect,
+        ));
+      }
+      continue;
+    }
     checked++;
     if (ratio < required) {
       low.add(LowContrast(
@@ -591,8 +615,12 @@ ContrastReport measureTextContrast(
     }
   }
   low.sort((a, b) => a.ratio.compareTo(b.ratio));
-  return ContrastReport(checked: checked, low: low);
+  icons.sort((a, b) => a.ratio.compareTo(b.ratio));
+  return ContrastReport(checked: checked, low: low, lowIcons: icons);
 }
+
+bool _isPrivateUse(int rune) =>
+    (rune >= 0xE000 && rune <= 0xF8FF) || (rune >= 0xF0000 && rune <= 0x10FFFD);
 
 TextStyle? _firstStyle(InlineSpan span) {
   if (span.style?.color != null) return span.style;
@@ -614,6 +642,7 @@ class Tappable {
     required this.width,
     required this.height,
     this.nestedInLargerTarget = false,
+    this.fullScreen = false,
   });
 
   final String label;
@@ -627,6 +656,9 @@ class Tappable {
   /// hit area is the ancestor, so this is not a touch-target defect.
   final bool nestedInLargerTarget;
 
+  /// Covers 90%+ of the screen: a tap catcher, skipped by explore.
+  final bool fullScreen;
+
   Map<String, Object?> toJson() => {
         'label': label,
         'x': _r(left),
@@ -634,6 +666,7 @@ class Tappable {
         'width': _r(width),
         'height': _r(height),
         'nested_in_larger_target': nestedInLargerTarget,
+        if (fullScreen) 'full_screen': true,
       };
 
   static double _r(double v) => (v * 10).roundToDouble() / 10;
@@ -648,6 +681,8 @@ List<Tappable> collectTappables(
 }) {
   final out = <Tappable>[];
   final seen = <String>{};
+  final screen = root.rect;
+  final screenArea = screen.width * screen.height / (dpr * dpr);
   void walk(SemanticsNode n, Matrix4 parent, Rect? enclosingTarget) {
     final m = n.transform == null ? parent : (parent.clone()..multiply(n.transform!));
     final data = n.getSemanticsData();
@@ -659,7 +694,11 @@ List<Tappable> collectTappables(
       final nested = enclosingTarget != null &&
           enclosingTarget.contains(logical.topLeft) &&
           enclosingTarget.contains(logical.bottomRight - const Offset(0.01, 0.01));
-      if (logical.width >= minTapSize && logical.height >= minTapSize) enclosing = logical;
+      // A target covering (almost) the whole screen is a tap catcher
+      // (dismiss keyboard, close overlay), not a parent control: it must not
+      // mark everything inside it as nested, and it is not worth exploring.
+      final fullScreen = screenArea > 0 && logical.width * logical.height >= screenArea * 0.9;
+      if (!fullScreen && logical.width >= minTapSize && logical.height >= minTapSize) enclosing = logical;
       final label = (data.label.isNotEmpty
               ? data.label
               : data.tooltip.isNotEmpty
@@ -675,6 +714,7 @@ List<Tappable> collectTappables(
           width: logical.width,
           height: logical.height,
           nestedInLargerTarget: nested,
+          fullScreen: fullScreen,
         ));
       }
     }
