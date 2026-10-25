@@ -68,6 +68,9 @@ light and dark variants side by side.
 4. Take these as confirmed findings without further checking:
    - every entry in `tappables_below_min` (touch target below the minimum,
      coordinates and size are given);
+   - every entry in `low_contrast` (measured WCAG ratio of the rendered
+     text colour against the sampled background, with the required 4.5 or
+     3.0 threshold; quote `ratio`, `fg`, `bg`);
    - every entry in `exceptions` (RenderFlex overflow, unbounded height, ...);
    - screens with `status: error` (the route could not render in a test;
      usually a missing dependency or side effect in the factory).

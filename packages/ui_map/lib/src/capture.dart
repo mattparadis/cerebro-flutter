@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 
 import 'config.dart';
+import 'contrast.dart';
 import 'fonts.dart';
 import 'routes.dart';
 
@@ -183,6 +184,8 @@ class UiMap {
 
       final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       final pngPath = p.join(screensDir.path, '$id.png');
+      Uint8List? rgba;
+      var imageW = 0, imageH = 0;
       await tester.runAsync(() async {
         final image = await boundary.toImage(pixelRatio: config.exportScale);
         try {
@@ -190,10 +193,19 @@ class UiMap {
           File(pngPath).writeAsBytesSync(bytes!.buffer.asUint8List());
           result['width_px'] = image.width;
           result['height_px'] = image.height;
+          imageW = image.width;
+          imageH = image.height;
+          final raw = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+          rgba = raw?.buffer.asUint8List();
         } finally {
           image.dispose();
         }
       });
+      if (rgba != null) {
+        final report = measureTextContrast(tester, rgba!, imageW, imageH, scale: config.exportScale);
+        result['text_nodes_checked'] = report.checked;
+        result['low_contrast'] = report.low.map((e) => e.toJson()).toList();
+      }
       result['png'] = p.relative(pngPath, from: outDir);
       result['sha256_png'] = sha256.convert(File(pngPath).readAsBytesSync()).toString();
 
@@ -280,6 +292,114 @@ class UiMap {
     final s = v.toStringAsFixed(2);
     return s.endsWith('0') ? s.substring(0, s.length - 1) : s;
   }
+}
+
+class LowContrast {
+  const LowContrast({
+    required this.text,
+    required this.ratio,
+    required this.required,
+    required this.foreground,
+    required this.background,
+    required this.fontSize,
+    required this.rect,
+  });
+
+  final String text;
+  final double ratio;
+  final double required;
+  final int foreground;
+  final int background;
+  final double fontSize;
+  final Rect rect;
+
+  Map<String, Object?> toJson() => {
+        'text': text,
+        'ratio': (ratio * 100).round() / 100,
+        'required': required,
+        'fg': _hex(foreground),
+        'bg': _hex(background),
+        'font_size': fontSize,
+        'x': Tappable._r(rect.left),
+        'y': Tappable._r(rect.top),
+        'width': Tappable._r(rect.width),
+        'height': Tappable._r(rect.height),
+      };
+
+  static String _hex(int c) => '#${c.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+}
+
+class ContrastReport {
+  const ContrastReport({required this.checked, required this.low});
+
+  final int checked;
+  final List<LowContrast> low;
+}
+
+/// Measures WCAG contrast for every rendered paragraph: the text colour is
+/// known from the `RenderParagraph`, the background is sampled from the
+/// screenshot pixels under it. Text with an alpha colour is composited.
+ContrastReport measureTextContrast(
+  WidgetTester tester,
+  Uint8List rgba,
+  int imageW,
+  int imageH, {
+  required double scale,
+}) {
+  var checked = 0;
+  final low = <LowContrast>[];
+  final seen = <String>{};
+  for (final element in find.byType(RichText).evaluate()) {
+    final ro = element.renderObject;
+    if (ro is! RenderParagraph || !ro.attached || !ro.hasSize) continue;
+    final span = ro.text;
+    final plain = span.toPlainText().trim();
+    if (plain.isEmpty) continue;
+    final style = _firstStyle(span);
+    final color = style?.color;
+    if (color == null) continue;
+    final offset = ro.localToGlobal(Offset.zero);
+    final rect = offset & ro.size;
+    if (rect.isEmpty || rect.width < 2 || rect.height < 2) continue;
+    final key = '$plain|${rect.left.round()}|${rect.top.round()}';
+    if (!seen.add(key)) continue;
+    final argb = color.toARGB32();
+    final left = (rect.left * scale).round(), top = (rect.top * scale).round();
+    final w = (rect.width * scale).round(), h = (rect.height * scale).round();
+    final fgOpaque = argb & 0xFFFFFF;
+    final bg = sampleBackground(rgba, imageW, imageH, left: left, top: top, width: w, height: h, foreground: fgOpaque);
+    if (bg == null) continue;
+    final fg = compositeOver(argb, bg);
+    final ratio = contrastRatio(fg, bg);
+    final fontSize = style?.fontSize ?? 14;
+    final bold = (style?.fontWeight?.value ?? 400) >= FontWeight.w700.value;
+    final required = requiredContrast(fontSize: fontSize, bold: bold);
+    checked++;
+    if (ratio < required) {
+      low.add(LowContrast(
+        text: plain.length > 40 ? '${plain.substring(0, 40)}…' : plain,
+        ratio: ratio,
+        required: required,
+        foreground: fg,
+        background: bg,
+        fontSize: fontSize,
+        rect: rect,
+      ));
+    }
+  }
+  low.sort((a, b) => a.ratio.compareTo(b.ratio));
+  return ContrastReport(checked: checked, low: low);
+}
+
+TextStyle? _firstStyle(InlineSpan span) {
+  if (span.style?.color != null) return span.style;
+  if (span is TextSpan && span.children != null) {
+    for (final c in span.children!) {
+      final s = _firstStyle(c);
+      if (s != null) return s;
+    }
+  }
+  return span.style;
 }
 
 /// A tappable semantics node with its rect in logical pixels.

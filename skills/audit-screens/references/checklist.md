@@ -42,8 +42,9 @@ NOTICE.
 ## C. Colour and contrast
 
 14. Body text contrast at least 4.5:1 against its background; large text
-    (18 sp+ or 14 sp bold) at least 3:1. Judge visually in both themes and
-    flag suspicious greys (e.g. `#BDBDBD` on white is 1.8:1).
+    (18 sp+ or 14 sp bold) at least 3:1. `low_contrast` in map.json holds
+    the measured ratios per text; anything not listed there passed, so
+    only add visual judgement for text on images or gradients.
 15. Colours come from `ColorScheme` roles; signs of hardcoded colours:
     a surface that stays light in the dark screenshot, text that stays
     dark-on-dark, an accent that does not match the rest of the app.

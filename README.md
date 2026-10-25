@@ -36,7 +36,7 @@ example/demo_app/         Flutter app with planted design defects, used as fixtu
 
    | File | Content |
    |---|---|
-   | `.ui-map/map.json` | summary, fonts report, route tree, skipped routes, one entry per screen (png, semantics, layout exceptions, `tappables_below_min`, sha256) |
+   | `.ui-map/map.json` | summary, fonts report, route tree, skipped routes, one entry per screen (png, semantics, layout exceptions, `tappables_below_min`, `low_contrast` with measured WCAG ratios, sha256) |
    | `.ui-map/MAP.md` | navigation tree as Mermaid + thumbnail table |
    | `.ui-map/screens/*.png` | screenshots with real Roboto / Material Icons glyphs; simulated system insets drawn as translucent bands so missing `SafeArea` is visible |
    | `.ui-map/semantics/*.txt` | semantics tree dump, deterministic across runs |
@@ -90,14 +90,22 @@ graph TD
 ```
 
 and `map.json` already carries deterministic findings, for example on
-`/settings`:
+`/settings` and `/notes`:
 
 ```json
 "tappables_below_min": [
   { "label": "Edit profile", "x": 337.0, "y": 120.0, "width": 32.0, "height": 32.0,
     "nested_in_larger_target": false }
+],
+"low_contrast": [
+  { "text": "Today, 09:12", "ratio": 1.69, "required": 4.5,
+    "fg": "#BDBDBD", "bg": "#EEF4F1", "font_size": 11.0, "x": 32.0, "y": 170.0, ... }
 ]
 ```
+
+Contrast is measured, not estimated: the text colour comes from the
+rendered `RenderParagraph`, the background is sampled from the screenshot
+under it, and the threshold follows WCAG AA (4.5, or 3.0 for large text).
 
 Then, in the same directory, ask Claude Code or Codex:
 
@@ -205,11 +213,9 @@ lint:
 
 ## Roadmap
 
-- Deterministic code-rule detector (hardcoded colours, missing SafeArea,
-  small targets in source) and a contrast measurement in `ui_map`.
-- Dynamic navigation edges (NavigatorObserver), diff between captures,
-  pre-commit / CI hook, MCP wrapper, Android emulator capture for native
-  plugins, Navigator 1.0 / auto_route support.
+- Dynamic navigation edges by exploring taps on every screen.
+- MCP wrapper, Android emulator capture for native plugins, Navigator 1.0
+  / auto_route support, network image mocking.
 
 ## Licence
 

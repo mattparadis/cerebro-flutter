@@ -42,6 +42,7 @@ class MapWriter {
         'error': screens.where((s) => s['status'] == 'error').length,
         'with_exceptions': screens.where((s) => ((s['exceptions'] as List?) ?? []).isNotEmpty).length,
         'with_small_tappables': screens.where((s) => ((s['tappables_below_min'] as List?) ?? []).isNotEmpty).length,
+        'with_low_contrast': screens.where((s) => ((s['low_contrast'] as List?) ?? []).isNotEmpty).length,
       },
       'screens': screens,
     };
@@ -59,7 +60,8 @@ class MapWriter {
     b.writeln();
     b.writeln('Generated ${map['generated_at']} · ${summary['screens']} screenshots · '
         '${summary['error']} errors · ${summary['with_exceptions']} with layout exceptions · '
-        '${summary['with_small_tappables']} with tap targets below minimum.');
+        '${summary['with_small_tappables']} with tap targets below minimum · '
+        '${summary['with_low_contrast']} with low-contrast text.');
     b.writeln();
     b.writeln('## Navigation tree');
     b.writeln();
@@ -131,6 +133,8 @@ class MapWriter {
         if (exc.isNotEmpty) notes.add('${exc.length} exception(s)');
         final small = (s['tappables_below_min'] as List?) ?? const [];
         if (small.isNotEmpty) notes.add('${small.length} small tap target(s)');
+        final lowc = (s['low_contrast'] as List?) ?? const [];
+        if (lowc.isNotEmpty) notes.add('${lowc.length} low-contrast text(s)');
         if (s['error'] != null) notes.add('${s['error']}');
         final png = s['png'];
         final img = png == null ? '' : '<img src="$png" width="120" alt="${s['id']}">';

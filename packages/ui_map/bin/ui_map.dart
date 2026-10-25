@@ -190,7 +190,8 @@ Future<int> _capture(String root, String configPath, String outDir, List<String>
   stdout.writeln();
   stdout.writeln('ui_map: ${summary['ok']}/${summary['screens']} screens captured, '
       '${summary['error']} errors, ${summary['with_exceptions']} with layout exceptions, '
-      '${summary['with_small_tappables']} with small tap targets.');
+      '${summary['with_small_tappables']} with small tap targets, '
+      '${summary['with_low_contrast']} with low-contrast text.');
   stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'map.json'), from: root)} and MAP.md written.');
   if (testCode != 0 || (summary['error'] as int) > 0) return 1;
   return 0;
