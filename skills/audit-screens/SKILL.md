@@ -42,6 +42,12 @@ The command writes:
 - `.ui-map/MAP.md`: the navigation tree as Mermaid plus thumbnails.
 - `.ui-map/screens/*.png`, `.ui-map/semantics/*.txt`.
 
+If `.ui-map/DIFF.md` exists (the project runs `dart run ui_map check`
+against a baseline), read it first: audit the **changed** and **added**
+screens in depth and only skim unchanged ones, and report regressions it
+lists (new layout exceptions, new small targets, screens that stopped
+rendering) as severity 3-4 findings.
+
 If `fonts.warnings` is non-empty, say so: glyph-level findings (type scale,
 line length) are unreliable with the fallback font.
 

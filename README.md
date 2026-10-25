@@ -125,6 +125,44 @@ sample values in `ui_map.yaml`; screens that hit the network or platform
 channels at build time will render their error/empty branch (no HTTP in
 `flutter test`).
 
+## Keep screenshots up to date: baseline, diff, check
+
+```bash
+dart run ui_map capture      # current state
+dart run ui_map baseline     # copy it to .ui-map/baseline/ (commit this in your app)
+# ... change the app ...
+dart run ui_map check        # capture + diff; exit 1 on regressions
+```
+
+`check` writes `.ui-map/diff.json` and `.ui-map/DIFF.md` (before/after
+thumbnails) and classifies each change as visual only, semantics only
+(labels, actions), or a **regression**: a screen that stopped rendering, a
+new layout exception, or a new tap target below the minimum. Hashes are
+deterministic, so an unchanged screen never shows up. Use `--fail-on any`
+to block on every pixel change, `--fail-on none` to only report.
+
+Pre-commit hook (`.git/hooks/pre-commit` or your hook manager):
+
+```sh
+#!/bin/sh
+if git diff --cached --name-only | grep -qE '^(lib/|ui_map.yaml|pubspec.yaml)'; then
+  dart run ui_map check || { echo "ui_map: UI regressions, see .ui-map/DIFF.md"; exit 1; }
+fi
+```
+
+GitHub Actions step (after `flutter pub get`):
+
+```yaml
+- run: dart run ui_map check --fail-on regression
+- uses: actions/upload-artifact@v4
+  if: always()
+  with: { name: ui-map, path: .ui-map }
+```
+
+When a change is intentional, run `dart run ui_map baseline` again and
+commit the new baseline with the code; the agent reading `DIFF.md` can
+tell you which screens to look at before you do.
+
 ## `ui_map.yaml`
 
 ```yaml

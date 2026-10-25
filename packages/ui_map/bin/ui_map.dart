@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
+import 'package:ui_map/src/diff.dart';
 import 'package:ui_map/src/map_writer.dart';
 import 'package:ui_map/src/templates.dart';
 
@@ -15,6 +16,9 @@ Commands:
   init      Scaffold ui_map.yaml, test/ui_map/app_factory.dart and the capture test.
   routes    Print the route tree and the locations that would be captured.
   capture   Capture every screen, then write .ui-map/map.json and MAP.md.
+  baseline  Save the current capture as the baseline (.ui-map/baseline/) for diff.
+  diff      Compare the current capture with the baseline; write diff.json and DIFF.md.
+  check     capture + diff in one step (for pre-commit hooks and CI).
 
 Run from the root of the Flutter app (where pubspec.yaml is).
 ''';
@@ -26,7 +30,13 @@ Future<void> main(List<String> argv) async {
     ..addOption('config', help: 'Path to ui_map.yaml (default: ./ui_map.yaml).')
     ..addOption('out', help: 'Output directory (default: out_dir in config, else .ui-map).')
     ..addMultiOption('dart-define', abbr: 'D',
-        help: 'Extra --dart-define=KEY=VALUE forwarded to flutter test (e.g. -D UI_PROTO=true).');
+        help: 'Extra --dart-define=KEY=VALUE forwarded to flutter test (e.g. -D UI_PROTO=true).')
+    ..addOption('baseline', help: 'Baseline map.json or directory (default: <out>/baseline).')
+    ..addOption('fail-on',
+        allowed: ['none', 'regression', 'any'],
+        defaultsTo: 'regression',
+        help: 'diff/check exit code 1 on: regressions (errors, new layout exceptions, new small '
+            'targets), any change, or never.');
   final ArgResults args;
   try {
     args = parser.parse(argv);
@@ -56,6 +66,14 @@ Future<void> main(List<String> argv) async {
       exit(await _routes(root, configPath, outDir, defines));
     case 'capture':
       exit(await _capture(root, configPath, outDir, defines));
+    case 'baseline':
+      exit(_baseline(root, outDir));
+    case 'diff':
+      exit(_diff(root, outDir, args['baseline'] as String?, args['fail-on'] as String));
+    case 'check':
+      final code = await _capture(root, configPath, outDir, defines);
+      if (code != 0) exit(code);
+      exit(_diff(root, outDir, args['baseline'] as String?, args['fail-on'] as String));
     default:
       stderr.writeln('Unknown command: ${args.rest.first}');
       stderr.writeln(_usage);
@@ -165,6 +183,65 @@ Future<int> _capture(String root, String configPath, String outDir, List<String>
   stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'map.json'), from: root)} and MAP.md written.');
   if (testCode != 0 || (summary['error'] as int) > 0) return 1;
   return 0;
+}
+
+int _baseline(String root, String outDir) {
+  final map = File(p.join(outDir, 'map.json'));
+  if (!map.existsSync()) {
+    stderr.writeln('ui_map: no capture found at ${p.relative(map.path, from: root)}. Run `dart run ui_map capture` first.');
+    return 66;
+  }
+  final base = Directory(p.join(outDir, 'baseline'));
+  if (base.existsSync()) base.deleteSync(recursive: true);
+  Directory(p.join(base.path, 'screens')).createSync(recursive: true);
+  map.copySync(p.join(base.path, 'map.json'));
+  var copied = 0;
+  final screens = Directory(p.join(outDir, 'screens'));
+  if (screens.existsSync()) {
+    for (final f in screens.listSync().whereType<File>()) {
+      f.copySync(p.join(base.path, 'screens', p.basename(f.path)));
+      copied++;
+    }
+  }
+  stdout.writeln('ui_map: baseline saved to ${p.relative(base.path, from: root)}/ ($copied screenshots).');
+  stdout.writeln('ui_map: commit that directory to diff against it in CI.');
+  return 0;
+}
+
+int _diff(String root, String outDir, String? baselineArg, String failOn) {
+  final currentPath = p.join(outDir, 'map.json');
+  if (!File(currentPath).existsSync()) {
+    stderr.writeln('ui_map: no capture found. Run `dart run ui_map capture` first.');
+    return 66;
+  }
+  final baselinePath = p.absolute(baselineArg ?? p.join(outDir, 'baseline'));
+  final Map<String, Object?> baseline;
+  try {
+    baseline = readMap(baselinePath);
+  } on FileSystemException catch (e) {
+    stderr.writeln('ui_map: baseline not found (${e.path}). Run `dart run ui_map baseline` after a capture you trust.');
+    return 66;
+  }
+  final current = readMap(currentPath);
+  final baselineDir = FileSystemEntity.isDirectorySync(baselinePath) ? baselinePath : p.dirname(baselinePath);
+  final diff = CaptureDiff.compare(baseline, current, baselinePrefix: p.relative(baselineDir, from: outDir));
+  File(p.join(outDir, 'diff.json'))
+      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(diff.toJson()));
+  File(p.join(outDir, 'DIFF.md')).writeAsStringSync(diff.renderMarkdown());
+  final regressions = diff.changed.where((c) => c.isRegression).length;
+  stdout.writeln('ui_map diff: ${diff.changed.length} changed ($regressions regressions), '
+      '${diff.added.length} added, ${diff.removed.length} removed, ${diff.unchanged} unchanged.');
+  for (final c in diff.changed.take(10)) {
+    stdout.writeln('  ${c.isRegression ? '!!' : '  '} ${c.location} · ${c.theme}'
+        '${c.textScale == 1.0 ? '' : ' · x${c.textScale}'}: ${c.describe()}');
+  }
+  if (diff.changed.length > 10) stdout.writeln('  ... see ${p.relative(p.join(outDir, 'DIFF.md'), from: root)}');
+  stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'DIFF.md'), from: root)} written.');
+  return switch (failOn) {
+    'any' => diff.hasChanges ? 1 : 0,
+    'regression' => regressions > 0 ? 1 : 0,
+    _ => 0,
+  };
 }
 
 String? _flutterVersion() {
