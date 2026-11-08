@@ -1,0 +1,124 @@
+Build a Flutter mobile app called **Rigattiere**, a second-hand marketplace
+for a single city. Work autonomously: do not ask me questions, make
+reasonable assumptions and list them in your final message.
+
+### Who it is for
+
+People who buy and sell used things locally: students furnishing a room on
+a budget, parents passing on kids' gear, collectors hunting for one
+specific object. They use the app one-handed, often outdoors or on public
+transport, for short sessions. The first thing they want on any screen is
+to judge quickly whether an item is worth their time: photo, price,
+distance, and whether the seller answers. Trust and speed matter more than
+features.
+
+### Screens and states
+
+1. **Browse** (`/`): a vertically scrolling feed of items, each with photo,
+   title, price, distance and seller first name. A category filter row at
+   the top (Furniture, Kids, Bikes, Books, Electronics, Other) and a
+   search field. States: loading (skeleton, same layout), full, empty for
+   a filter with no results (with a way out), network error with retry.
+2. **Item detail** (`/items/:id`): photo carousel, title, price, condition,
+   description, distance, seller card (name, response time, rating), and a
+   single primary action "Make an offer" that opens the chat. States:
+   loaded, loading, item no longer available (sold), not found.
+3. **Chat with the seller** (`/chat/:conversationId`): message thread with
+   the item pinned at the top (photo, title, price), text input, and an
+   **offer** affordance: the buyer proposes a price; the offer appears in
+   the thread as a distinct message with Accept / Decline on the seller's
+   side and a status on the buyer's side (pending, accepted, declined,
+   expired). States: empty conversation (no messages yet), active thread,
+   offer pending, offer accepted, offer declined, send failed with retry.
+4. **Profile** (`/profile`): the user's avatar and name, rating, member
+   since, two tabs or sections "My listings" and "Saved", settings entry
+   (notifications, dark mode preference, log out). States: with listings,
+   with no listings (first-time seller), loading.
+5. **Post an item** (`/sell`, opened from a primary action on Browse):
+   up to 5 photos (use placeholders), title, category, condition, price,
+   description, pickup area. Validation with clear inline errors. States:
+   empty, invalid (show errors), submitting, submit failed with retry,
+   success (land on the new item's detail, item visible in "My listings").
+
+Design every state, not just handle it. Empty states explain what to do
+next. Errors say what happened in plain words and offer a retry.
+
+### The offer flow has a contract
+
+- Making an offer: the input validates (positive number, not above the
+  asking price by more than 10%), the send button is disabled while the
+  request is in flight (no double offer), a failed send keeps the typed
+  amount and offers retry, a successful send shows the offer message as
+  pending immediately.
+- The seller side (simulate it in the fake data layer with a delayed
+  response): an accepted offer updates the pinned item area with the agreed
+  price and a next step; a declined one lets the buyer offer again; after
+  a timeout the offer expires visibly.
+- Leaving the chat and coming back keeps the thread and the offer state.
+- Going back from the detail to Browse keeps the scroll position and the
+  selected filter.
+
+Write widget tests for this flow against the fake data layer: offer
+persisted, double tap blocked while in flight, failure then retry
+succeeds without a duplicate, accept updates the item area. State
+clearly in the final message what the tests prove and what would still
+need a real backend or device.
+
+### Aesthetic direction
+
+Not a generic marketplace. The feel is a **neighbourhood flea market**:
+handwritten price tags, stamped paper, things with a past. Three words:
+*warm, honest, a bit cheeky*.
+
+- References: the price-tag typography of old hardware stores (take the
+  confident, slightly oversized numerals), and printed classifieds (take
+  the dense but orderly rhythm, the ruled separators, the restraint in
+  colour). Do not imitate either literally.
+- Typography: a display face with character for prices and screen titles,
+  a quiet, highly legible sans for everything else. Prices are the
+  loudest element on every card.
+- Colour: an off-white paper base in light mode, a deep warm charcoal in
+  dark mode; one earthy accent (think terracotta, ochre or olive, choose
+  one) used only for the primary action and the offer state; status
+  colours stay muted. Black ink for text, never pure black on pure white.
+- Surfaces: flat paper, hairline rules and generous whitespace instead of
+  floating white cards with shadows; corners small, not pill-shaped
+  everywhere. A single tactile detail is welcome (a stamp-like badge for
+  "sold" or "accepted"), not a texture on every surface.
+- Motion: short, physical, used for state changes (offer sent, accepted),
+  not for decoration.
+- Avoid: gradients, purple or electric blue, rounded-everything, emoji as
+  icons, centred layouts on list screens, placeholder-only form fields.
+
+The direction must survive dark mode, large text (1.3×) and real content
+(long titles, four-digit prices, a 2-line description cut with an
+ellipsis).
+
+### Technical constraints
+
+- Flutter stable, Material 3 as the base, **go_router** for navigation
+  with the paths above (nested routes where it makes sense so back works
+  from a deep link).
+- No backend: an in-memory fake data layer with realistic seed data
+  (at least 12 items with varied titles and prices, 3 conversations) and
+  simulated latency and failures that tests and screenshots can trigger
+  (a query parameter such as `?state=empty|error` on list screens, or
+  named fixtures in the test layer; say which).
+- Light and dark theme from one source of truth; no hardcoded colours
+  in screens; typography through the theme.
+- `flutter analyze` clean; all tests pass.
+
+### Deliver
+
+- The project in this folder, runnable with `flutter run`.
+- A short `DESIGN.md`: the assumptions you made, how the aesthetic
+  direction was translated into the theme (fonts, colours, shapes,
+  spacing), the states each screen has and how to reach them, what the
+  tests prove and what they do not.
+- In the final message: files created, how to reach every state, and the
+  three design decisions you would want a reviewer to look at first.
+
+### Tooling
+Skills for Flutter UI design and audit are installed in this project
+(`.claude/skills`): use them. The `ui_map` dev dependency they rely on is
+already in `pubspec.yaml`.

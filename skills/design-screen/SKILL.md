@@ -1,6 +1,6 @@
 ---
 name: design-screen
-description: Design a new Flutter mobile screen (or redesign an existing one) with the right UI/UX theory, Material 3 / Apple HIG rules, the app's own conventions, and a capture-and-check loop. Use when asked to design, create, build, mock up, prototype, propose directions for, or redesign a screen, page, flow, onboarding, paywall, settings, list, detail or form in a Flutter app. Has a prototype mode that produces 2-3 throwaway directions as screenshots before any real code, and a build mode that ships the real screen.
+description: Design and build Flutter mobile UI with the right UI/UX theory, Material 3 / Apple HIG rules, the app's own conventions, and a capture-and-check loop with ui_map. Use whenever Flutter UI is being written or changed from a brief: a whole app or several screens from scratch, a new screen, page, flow, onboarding, paywall, settings, list, detail or form, a redesign, or a request to design, create, build, mock up, prototype or propose directions. Has a prototype mode that produces 2-3 throwaway directions as screenshots before any real code, and a build mode that ships the real screens. Covers setting up ui_map in a project that does not have it yet.
 ---
 
 # Design screen
@@ -25,6 +25,33 @@ needs; do not paste them into the output.
 | `references/material3.md` | colour roles, type scale, shape, spacing, components, motion, Flutter theme wiring |
 | `references/hig-cupertino.md` | Apple HIG essentials, Cupertino widgets, platform-adaptive strategy |
 | `references/anti-patterns.md` | what makes a screen look AI-generated or break on devices; checked before delivery |
+
+## 0. Make sure ui_map can run (once per project)
+
+The capture loop below needs the `ui_map` dev dependency. Check
+`pubspec.yaml` first; if it is missing, add it and scaffold it:
+
+```sh
+# from the repo that ships this skill (adjust the URL or use a local path)
+dart pub add 'dev:ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux-design-skill.git","path":"packages/ui_map"}}'
+# or, with a checkout next to the project:
+dart pub add 'dev:ui_map:{"path":"../flutter-ui-ux-design-skill/packages/ui_map"}'
+dart run ui_map init            # ui_map.yaml + test/ui_map/app_factory.dart
+dart run ui_map routes          # must list every screen before you design
+```
+
+Fill `test/ui_map/app_factory.dart` with the app's real router and root
+widget as soon as they exist (for a new app: right after the first
+screen compiles), and keep `ui_map.yaml` current (params, variants,
+`keyboard: true` on forms and chats, `text_scales: [1.0, 1.3]`).
+Fonts: `flutter test` cannot download, so bundle the font files as
+assets (preferred for a brief that names the typography) or list them
+under `fonts:` in `ui_map.yaml`; never judge type from a stand-in font.
+
+If the dependency cannot be installed (no network, private repo), say so
+in the deliverable, keep going with a widget-test golden harness of your
+own that loads the real font files, and mark every visual claim as
+`not_checked` with ui_map.
 
 ## 1. Brief (always, short)
 

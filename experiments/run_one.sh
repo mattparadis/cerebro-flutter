@@ -1,9 +1,9 @@
 #!/bin/sh
-# usage: run_one.sh <label> <dir>
+# usage: run_one.sh <label> <dir> [prompt-file]
 set -u
 LABEL="$1"; DIR="$2"
 OUT=/home/matt/code/flutter-ui-ux-design-skill/experiments
-PROMPT="$(cat "$OUT/prompt.txt")"
+PROMPT="$(cat "${3:-$OUT/prompt.txt}")"
 cd "$DIR" || exit 1
 START=$(date +%s)
 env -u CLAUDECODE timeout 5400 claude -p "$PROMPT" \
