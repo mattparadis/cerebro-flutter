@@ -61,7 +61,9 @@ rendering) as severity 3-4 findings.
 
 Run the capture with `--explore` when auditing navigation (or when the
 app is small): `map.json` then has `edges` (what every tap does),
-`no_effect_taps` and the count of `state_change` taps. Use them as evidence:
+`no_effect_taps`, the count of `state_change` taps and, per edge, `transition`
+(`animated` / `instant` / `continuous` / `unknown`) with `transition_ms`, the
+motion evidence for checklist section I. Use them as evidence:
 
 - a `no_effect_taps` entry on a button, tile with a chevron, chip or link
   is a `suspected` "looks interactive, does nothing" finding (severity 3 on

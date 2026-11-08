@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -62,6 +63,10 @@ class UiMap {
           await _captureOne(tester, id: id, target: t, combo: combo, env: env, driver: driver);
         });
       }
+    }
+    final protos = targets.where((t) => !t.skipped && t.routePath.startsWith('/__proto/')).toList();
+    if (protos.isNotEmpty) {
+      testWidgets('ui_map proto sheet', (tester) async => _protoSheet(tester, env, protos));
     }
   }
 
@@ -422,6 +427,9 @@ class UiMap {
         .take(config.exploreMaxTaps)
         .toList();
     var unlabeled = 0;
+    final frameKey = GlobalKey();
+    final outerWrap = wrap;
+    wrap = (app) => RepaintBoundary(key: frameKey, child: outerWrap(app));
     for (final t in candidates) {
       final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
       await _applyScenario(tester, env, target);
@@ -433,14 +441,29 @@ class UiMap {
       final from = before.location;
       final semanticsBefore = _semanticsFingerprint(tester);
       String? error;
+      final mask = Rect.fromLTWH(t.left - 8, t.top - 8, t.width + 16, t.height + 16);
+      final sampler = _FrameSampler(tester, frameKey, mask);
+      final busyBefore = await sampler.changedOver(const Duration(milliseconds: 50));
       try {
-        await tester.tapAt(Offset(t.left + t.width / 2, t.top + t.height / 2));
-        for (var i = 0; i < 8; i++) {
+        // The tap runs in a guarded zone: an `async` handler that throws
+        // (e.g. `context.pop()` with nothing to pop) completes an unawaited
+        // future with an error, which would otherwise fail the whole test
+        // instead of becoming an `error` edge.
+        await runZonedGuarded(() async {
+          await tester.tapAt(Offset(t.left + t.width / 2, t.top + t.height / 2));
+          await tester.pump();
+        }, (e, st) => error ??= _firstLine(e.toString()));
+        for (var e = tester.takeException(); e != null; e = tester.takeException()) {
+          error ??= _firstLine(e.toString());
+        }
+        await sampler.sample(const Duration(milliseconds: 50), count: 12);
+        for (var i = 0; i < 4; i++) {
           await tester.pump(const Duration(milliseconds: 100));
         }
       } catch (e) {
         error = _firstLine(e.toString());
       }
+      final motion = busyBefore ? _Motion.unknown : sampler.classify();
       for (var e = tester.takeException(); e != null; e = tester.takeException()) {
         error ??= _firstLine(e.toString());
       }
@@ -461,26 +484,116 @@ class UiMap {
       }
       if (overlay == null && afterSnap.popup) overlay = 'popup';
       if (overlay != null && to != from) overlay = null; // navigation wins
+      final kind = classifyEdge(
+        from: from,
+        to: to,
+        depthBefore: depthBefore,
+        depthAfter: depthAfter,
+        overlay: overlay,
+        error: error,
+        contentChanged: contentChanged,
+      );
+      final noEffect = kind == 'no_observed_effect' && motion.kind == 'instant';
       edges.add(NavEdge(
         from: from,
         label: label,
         to: to,
-        kind: classifyEdge(
-          from: from,
-          to: to,
-          depthBefore: depthBefore,
-          depthAfter: depthAfter,
-          overlay: overlay,
-          error: error,
-          contentChanged: contentChanged,
-        ),
+        kind: kind,
         overlay: overlay,
         error: error,
         x: t.left + t.width / 2,
         y: t.top + t.height / 2,
+        transition: noEffect ? null : motion.kind,
+        transitionMs: motion.ms,
       ));
     }
     return edges;
+  }
+
+  /// Composes `.ui-map/proto/<name>.png` for every `/__proto/<name>` route:
+  /// one column per direction (base location + each variant), one row per
+  /// theme, first device and platform, text scale 1.0. Lists them in
+  /// `PROTO.md`, so a prototype review is one image per screen.
+  static Future<void> _protoSheet(WidgetTester tester, _Env env, List<ScreenTarget> protos) async {
+    final combos = _combos(env).toList();
+    final firstLocale = env.config.locales.isEmpty ? null : env.config.locales.first;
+    final rowsCombos = combos
+        .where((c) =>
+            c.textScale == 1.0 &&
+            c.locale == firstLocale &&
+            c.device == combos.first.device &&
+            c.platform == combos.first.platform)
+        .toList();
+    final protoDir = Directory(p.join(env.outDir, 'proto'))..createSync(recursive: true);
+    final md = StringBuffer('# Prototype directions\n\n');
+    final byRoute = <String, List<ScreenTarget>>{};
+    for (final t in protos) {
+      if (t.keyboard || t.scenario != null) continue;
+      byRoute.putIfAbsent(t.routePath, () => []).add(t);
+    }
+    for (final entry in byRoute.entries) {
+      final name = entry.key.substring('/__proto/'.length).replaceAll('/', '_');
+      final cols = entry.value;
+      final labels = [for (final t in cols) t.location.contains('?') ? t.location.split('?').last : 'default'];
+      final grid = <List<ui.Image?>>[];
+      for (final c in rowsCombos) {
+        final row = <ui.Image?>[];
+        for (final t in cols) {
+          final f = File(p.join(env.outDir, 'screens', '${_idFor(t, c, firstLocale: true)}.png'));
+          if (!f.existsSync()) {
+            row.add(null);
+            continue;
+          }
+          final bytes = f.readAsBytesSync();
+          row.add(await tester.runAsync(() async {
+            final codec = await ui.instantiateImageCodec(bytes);
+            return (await codec.getNextFrame()).image;
+          }));
+        }
+        grid.add(row);
+      }
+      var cellW = 0, cellH = 0;
+      for (final img in grid.expand((r) => r).whereType<ui.Image>()) {
+        if (img.width > cellW) cellW = img.width;
+        if (img.height > cellH) cellH = img.height;
+      }
+      if (cellW == 0) continue;
+      const gutter = 24.0, header = 40.0;
+      final w = cols.length * cellW + (cols.length + 1) * gutter;
+      final h = grid.length * (cellH + header + gutter) + gutter;
+      final rec = ui.PictureRecorder();
+      final canvas = Canvas(rec);
+      canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFFE6E6E6));
+      for (var r = 0; r < grid.length; r++) {
+        for (var col = 0; col < cols.length; col++) {
+          final x = gutter + col * (cellW + gutter);
+          final y = gutter + r * (cellH + header + gutter);
+          final pb = ui.ParagraphBuilder(ui.ParagraphStyle(fontSize: 22))
+            ..pushStyle(ui.TextStyle(color: const Color(0xFF222222)))
+            ..addText('${labels[col]} · ${rowsCombos[r].theme}');
+          final para = pb.build()..layout(ui.ParagraphConstraints(width: cellW.toDouble()));
+          canvas.drawParagraph(para, Offset(x, y + 6));
+          final img = grid[r][col];
+          if (img != null) canvas.drawImage(img, Offset(x, y + header), Paint());
+        }
+      }
+      final picture = rec.endRecording();
+      final png = await tester.runAsync(() async {
+        final sheet = await picture.toImage(w.toInt(), h.toInt());
+        return sheet.toByteData(format: ui.ImageByteFormat.png);
+      });
+      if (png == null) continue;
+      File(p.join(protoDir.path, '$name.png')).writeAsBytesSync(png.buffer.asUint8List());
+      md
+        ..writeln('## $name')
+        ..writeln()
+        ..writeln('![$name](proto/$name.png)')
+        ..writeln()
+        ..writeln('Columns: ${labels.join(' · ')}. Rows: ${rowsCombos.map((c) => c.theme).join(', ')}. '
+            'Route `${entry.key}`; individual PNGs under `screens/`.')
+        ..writeln();
+    }
+    File(p.join(env.outDir, 'PROTO.md')).writeAsStringSync(md.toString());
   }
 
   /// Cheap fingerprint of what assistive tech would read: labels, values,
@@ -932,4 +1045,99 @@ List<Tappable> collectTappables(
 
   walk(root, Matrix4.identity(), null);
   return out;
+}
+
+
+/// Result of [_FrameSampler.classify].
+class _Motion {
+  const _Motion(this.kind, [this.ms]);
+  static const unknown = _Motion('unknown');
+  final String kind;
+  final int? ms;
+}
+
+/// Samples the explore boundary as raw RGBA at logical resolution and
+/// compares consecutive frames outside a masked rect (the tapped target, so
+/// ink ripples are ignored). Cheap enough to run for every explored tap.
+class _FrameSampler {
+  _FrameSampler(this.tester, this.key, this.mask);
+  final WidgetTester tester;
+  final GlobalKey key;
+  final Rect mask;
+  final List<bool> _changes = [];
+  Uint8List? _last;
+  int _width = 0;
+  int _height = 0;
+
+  Future<Uint8List?> _grab() async {
+    final ro = key.currentContext?.findRenderObject();
+    if (ro is! RenderRepaintBoundary || ro.debugNeedsPaint) return null;
+    final bytes = await tester.runAsync(() async {
+      final img = await ro.toImage(pixelRatio: 1.0);
+      _width = img.width;
+      _height = img.height;
+      final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+      img.dispose();
+      return data?.buffer.asUint8List();
+    });
+    return bytes;
+  }
+
+  bool _differs(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return true;
+    final x0 = mask.left.floor().clamp(0, _width), x1 = mask.right.ceil().clamp(0, _width);
+    final y0 = mask.top.floor().clamp(0, _height), y1 = mask.bottom.ceil().clamp(0, _height);
+    final stride = _width * 4;
+    for (var y = 0; y < _height; y++) {
+      final row = y * stride;
+      final masked = y >= y0 && y < y1;
+      for (var x = 0; x < _width; x++) {
+        if (masked && x >= x0 && x < x1) continue;
+        final i = row + x * 4;
+        if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2]) return true;
+      }
+    }
+    return false;
+  }
+
+  /// Two frames [gap] apart before the tap: true when the screen is already
+  /// animating on its own.
+  Future<bool> changedOver(Duration gap) async {
+    final a = await _grab();
+    await tester.pump(gap);
+    final b = await _grab();
+    _last = b;
+    return a != null && b != null && _differs(a, b);
+  }
+
+  /// Pumps [count] frames [step] apart after the tap and records which of
+  /// them differ from the previous one.
+  Future<void> sample(Duration step, {required int count}) async {
+    for (var i = 0; i < count; i++) {
+      await tester.pump(step);
+      final f = await _grab();
+      if (f == null || _last == null || f.length != _last!.length) {
+        _changes.add(false);
+      } else {
+        _changes.add(_differs(_last!, f));
+      }
+      if (f != null) _last = f;
+    }
+  }
+
+  _Motion classify() {
+    if (_changes.isEmpty) return _Motion.unknown;
+    final first = _changes.indexOf(true);
+    if (first < 0) return const _Motion('instant');
+    final last = _changes.lastIndexOf(true);
+    if (_changes.length >= 2 && _changes[_changes.length - 1] && _changes[_changes.length - 2]) {
+      return const _Motion('continuous');
+    }
+    var consecutive = false;
+    for (var i = 1; i < _changes.length; i++) {
+      if (_changes[i] && _changes[i - 1]) consecutive = true;
+    }
+    if (!consecutive) return const _Motion('instant');
+    return _Motion('animated', (last - first + 1) * 50);
+  }
 }

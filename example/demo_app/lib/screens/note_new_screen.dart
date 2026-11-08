@@ -58,9 +58,19 @@ class _NoteNewScreenState extends State<NoteNewScreen> {
     }
   }
 
+  /// Deep-linked (`/notes/new` opened from outside), there is nothing under
+  /// this screen to pop to, so fall back to the list.
+  void _leave() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/notes');
+    }
+  }
+
   Future<void> _discard() async {
     if (!_dirty) {
-      context.pop();
+      _leave();
       return;
     }
     final discard = await showAdaptiveDialog<bool>(
@@ -74,7 +84,7 @@ class _NoteNewScreenState extends State<NoteNewScreen> {
         ],
       ),
     );
-    if (discard == true && mounted) context.pop();
+    if (discard == true && mounted) _leave();
   }
 
   @override

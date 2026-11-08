@@ -127,8 +127,22 @@ NOTICE.
 39. Numbers, dates and currency are localised or at least consistent.
 40. Microcopy in empty / error states is specific to the screen, not generic.
 
+## I. Motion
+
+42. Page transitions exist: explored `push` and `pop` edges are
+    `transition: animated` (300-400 ms). `instant` means
+    `pageTransitionsTheme` was disabled or routes are swapped without a
+    Navigator; `confirmed` from `map.json`.
+43. State changes the user caused move: sending, saving, accepting,
+    selecting, expanding show as `animated` state_change edges with
+    durations under 400 ms. An `instant` flip on the screen's main action
+    is a finding (severity 2); decorative motion that loops
+    (`continuous` on a static screen) is a finding too.
+44. Motion respects reduce-motion (`MediaQuery.disableAnimations`) and
+    never blocks input; `not_checked` headlessly unless the code shows it.
+
 ## H. Heuristic sweep
 
-41. After A-G, scan the ten Nielsen heuristics in `heuristics.md` once for
+41. After A-G and I, scan the ten Nielsen heuristics in `heuristics.md` once for
     the screen and name the heuristic in the "Why it matters" column of any
     finding it explains (e.g. "H3 user control: no way out").

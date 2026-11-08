@@ -76,6 +76,10 @@ class MapWriter {
         'explored_taps': edges.length,
         'no_effect_taps': noEffect.length,
         'state_change_taps': stateChanges.length,
+        'animated_transitions': edges.where((e) => (e as Map)['transition'] == 'animated').length,
+        'instant_transitions': edges
+            .where((e) => (e as Map)['transition'] == 'instant' && e['kind'] != 'no_observed_effect')
+            .length,
       },
       'edges': edges,
       'no_effect_taps': noEffect,

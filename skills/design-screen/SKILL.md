@@ -9,12 +9,22 @@ Produce a Flutter screen a senior mobile designer would sign off: correct
 hierarchy, platform idiom, theme tokens only, every state designed, and
 verified from a rendered screenshot, not from the code alone.
 
-Two modes. Pick from the request; when unclear, ask once:
+Two modes:
 
 - **prototype**: 2-3 distinct directions with fake data, rendered as PNGs
   for the person to choose from. Throwaway code behind a flag.
 - **build**: the real screen wired into the app's router, with states,
   captured and self-audited before it is presented.
+
+**Starting from a brief, prototype first.** A new app, or a new screen
+with no sibling in the app to inherit from, goes through prototype mode
+for its key screens before any build: the two or three screens that carry
+the product (typically the list, the detail and the main action), two or
+three directions each, rendered side by side by ui_map (`.ui-map/PROTO.md`
+and `.ui-map/proto/<name>.png`). Then build the chosen direction and derive
+the remaining screens from it. Skip the prototype step only when the person
+says so, or when the screen is a variant of one the app already has. When a
+request names one mode explicitly, follow it.
 
 The references in `references/` are the theory. Read the ones the task
 needs; do not paste them into the output.
@@ -91,6 +101,13 @@ message:
    and keyboard-open screens the capture will run (`ui_map.yaml`); for a
    form, set `keyboard: true` on its route. What is not run is reported
    as not verified, never assumed.
+
+**Motion contract (part of the brief).** Name the three to five moments
+that move on this screen and what each motion says (arrived, sent,
+accepted, removed, revealed), using `references/patterns.md` → Motion.
+A screen with no named motion ships with no motion, and ui_map will show
+it: every `push`, `pop` and `state_change` edge carries `transition:
+animated | instant` and a duration.
 
 ## 2. Inherit the app's conventions, not its defects
 
@@ -191,11 +208,16 @@ default broken on purpose is a decision; a requirement broken is a defect.
 4. Capture with the flag: `dart run ui_map capture -D UI_PROTO=true`.
    Open the PNGs yourself and reject any direction that breaks the rules
    in step 3 before showing it.
-5. Present: for each direction, the PNG path(s) (light and dark), two
-   lines on the idea and its trade-off, and how it scores against the
-   brief's goals (legibility, speed of the main task, density, fit with
-   the app, behaviour with real content). Recommend one. Ask the person to
-   choose. Stop there.
+5. Present: the sheet `.ui-map/proto/<name>.png` (all directions side by
+   side, light and dark; `PROTO.md` lists them), two lines per direction on
+   the idea and its trade-off, and how each scores against the brief's
+   goals (legibility, speed of the main task, density, fit with the app,
+   behaviour with real content). Recommend one. Ask the person to choose.
+   Stop there.
+   Non-interactive run (nobody to ask): score the directions against those
+   goals in writing, pick the best, record the choice, the scores and the
+   sheet path in `DESIGN.md`, and continue with build mode. Keep the sheet
+   so the person can overrule the choice later.
 6. On a choice: build mode for that direction, then delete
    `lib/prototypes/<name>_proto.dart`, the guarded route and the yaml
    entry. Prototypes do not linger.
@@ -214,7 +236,10 @@ default broken on purpose is a decision; a requirement broken is a defect.
    `routes.<path>.scenarios` in `ui_map.yaml`; or, when the screen already
    reads a query parameter, URL variants (`?state=empty`).
 3. Add the route (and its `params` / `variants`) to `ui_map.yaml`, run
-   `dart run ui_map capture --explore`, and look at every PNG of the new
+   `dart run ui_map capture --explore`, check in `map.json` that the edges
+   named in the motion contract are `transition: animated` with durations
+   in the Material ranges (and that no push or pop is `instant` unless the
+   app deliberately disables page transitions), and look at every PNG of the new
    screen in light and dark (and `__x1.3` if `text_scales` includes 1.3).
    Check the new screen's `edges` in `map.json`: every control does what
    the brief says (navigates, opens an overlay, or changes content in

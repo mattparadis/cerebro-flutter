@@ -81,6 +81,43 @@ deep links open the screen with its parent stack (`/notes/1` can pop to
 `/notes`); tab switches never push; the system back button and the
 AppBar back do the same thing.
 
+## Motion (decide per moment, not per widget)
+
+Motion exists to explain a change: where something came from, that an
+action was received, that a state flipped. Decoration that loops or
+moves without a cause is noise. Decide the moments first, then pick the
+widget. Durations and curves: `material3.md` → Motion.
+
+| Moment | What the motion says | Flutter | Duration |
+|---|---|---|---|
+| Push / pop between screens | spatial relation (detail comes from the row) | `PageTransitionsTheme` (predictive back on Android, Cupertino on iOS); `Hero` on the photo or title that both screens share | 300-400 ms, emphasized |
+| Sheet / dialog appears | temporary layer above the page | `showModalBottomSheet` / `showDialog` defaults; `AnimatedPadding` for the keyboard | 250-300 ms |
+| Item added / removed in a list | the list changed here, not everywhere | `SliverAnimatedList` / `AnimatedList`, `AnimatedSize` for an expanding row | 200-300 ms |
+| Action received (send, save, post) | the tap landed, the system is working | button state to in-flight (`AnimatedSwitcher` of label ↔ progress), then the result | 100-200 ms in, result when it arrives |
+| State flipped (accepted, sold, saved, selected) | something is now true | `AnimatedScale` / `AnimatedOpacity` on the badge or stamp, `AnimatedContainer` on the card colour, `AnimatedSwitcher` on the text | 150-250 ms, overshoot only for the stamp |
+| Content arrives (load finished) | the skeleton became the real thing | `AnimatedSwitcher` from skeleton to content, `FadeTransition` on images | 150-250 ms |
+| Error / validation | look here | one `AnimatedContainer` border change plus scroll-to-field; no shake loops | 150 ms |
+| Selection (chip, tab, toggle) | the control is yours | the component's own ripple and state animation; do not add more | 50-150 ms |
+
+Rules:
+- Motion never blocks input for more than ~300 ms, and a transition never
+  delays data it could already show.
+- Respect `MediaQuery.disableAnimationsOf(context)`: durations go to zero,
+  nothing depends on motion to be understood.
+- One hero per transition, one stamp or badge animation per screen.
+- Implicit animations (`Animated*`, `TweenAnimationBuilder`) first;
+  explicit controllers only for choreography (stamp landing, staggered
+  list), always disposed.
+- Pages whose theme sets `pageTransitionsTheme` to none, or a chat/offer
+  screen whose state flips with no motion, read as "nothing happened".
+
+What ui_map can see: every explored `push`, `pop`, `go`, `overlay` and
+`state_change` edge has `transition: animated | instant | continuous |
+unknown` and `transition_ms`. `instant` on a push or pop means page
+transitions are off; `instant` on the state changes named in the motion
+contract means the contract was not built. `continuous` means an animation
+was still running after a second (spinner, shimmer, or a leak).
+
 ## Forms
 
 Legend: **R** requirement, **D** default, **C** context-dependent.

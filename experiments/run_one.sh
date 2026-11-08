@@ -9,7 +9,7 @@ START=$(date +%s)
 env -u CLAUDECODE timeout 5400 claude -p "$PROMPT" \
   --model claude-opus-5-5 \
   --permission-mode acceptEdits \
-  --allowedTools "Read,Write,Edit,Glob,Grep,Bash(flutter:*),Bash(dart:*),Bash(ls:*),Bash(cat:*),Bash(mkdir:*),Bash(find:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(cp:*),Bash(mv:*),Bash(touch:*),Bash(grep:*)" \
+  --allowedTools "Read,Write,Edit,Glob,Grep,Bash(flutter:*),Bash(dart:*),Bash(ls:*),Bash(cat:*),Bash(mkdir:*),Bash(find:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(cp:*),Bash(mv:*),Bash(touch:*),Bash(grep:*)${EXTRA_TOOLS:+,$EXTRA_TOOLS}" \
   --disallowedTools "Bash(flutter build:*),Bash(flutter run:*),Bash(flutter pub publish:*)" \
   --output-format json > "$OUT/run-$LABEL.json" 2> "$OUT/run-$LABEL.err"
 CODE=$?

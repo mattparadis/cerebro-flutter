@@ -10,6 +10,8 @@ class NavEdge {
     this.error,
     required this.x,
     required this.y,
+    this.transition,
+    this.transitionMs,
   });
 
   final String from;
@@ -31,6 +33,17 @@ class NavEdge {
   final double x;
   final double y;
 
+  /// Motion evidence, sampled every 50 ms after the tap with the tapped
+  /// rect masked (ink ripples do not count): `animated` (pixels outside the
+  /// target kept changing over consecutive frames), `instant` (at most one
+  /// jump, even a delayed one), `continuous` (still changing after the last
+  /// sample: spinner, shimmer or a leak), `unknown` (the screen was already
+  /// animating before the tap). Null when the tap had no observed effect.
+  final String? transition;
+
+  /// First-to-last change, in ms, when [transition] is `animated`.
+  final int? transitionMs;
+
   Map<String, Object?> toJson() => {
         'from': from,
         'label': label,
@@ -40,6 +53,8 @@ class NavEdge {
         if (error != null) 'error': error,
         'x': x,
         'y': y,
+        if (transition != null) 'transition': transition,
+        if (transitionMs != null) 'transition_ms': transitionMs,
       };
 }
 

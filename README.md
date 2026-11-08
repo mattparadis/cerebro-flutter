@@ -81,6 +81,19 @@ gets `edges` and `no_effect_taps` (suspects, not confirmed defects); `MAP.md` ge
 navigation edges labelled by the control that triggers them. On the demo
 this takes about 20 s for 62 taps.
 
+Every explored edge also carries **motion evidence**: frames are sampled
+every 50 ms after the tap with the tapped rect masked (ink ripples do not
+count), so `transition` is `animated` (with `transition_ms`), `instant`,
+`continuous` (still moving after 600 ms: spinner, shimmer or a leak) or
+`unknown` (the screen was already animating). `instant` on a `push`/`pop`
+means page transitions are off; `instant` on the state change behind the
+screen's main action means it ships without feedback motion. The summary
+counts `animated_transitions` and `instant_transitions`.
+
+Prototype routes (`/__proto/<name>`, captured with `-D UI_PROTO=true`) are
+also composed into one sheet per screen, `.ui-map/proto/<name>.png` (one
+column per direction, one row per theme), listed in `.ui-map/PROTO.md`.
+
 Large-text variants (`text_scales: [1.0, 1.3]`) and prototype routes
 (`dart run ui_map capture -D UI_PROTO=true`) are captured the same way.
 
