@@ -376,6 +376,14 @@ class UiMap {
       result['status'] = 'error';
       result['error'] = _firstLine(e.toString());
     } finally {
+      // Let one-shot timers started by the screen or by explore taps fire
+      // while the tree is still mounted (see UiMapConfig.drainTimersMs).
+      try {
+        for (var elapsed = 0; elapsed < config.drainTimersMs; elapsed += 5000) {
+          await tester.pump(const Duration(seconds: 5));
+        }
+        for (var e = tester.takeException(); e != null; e = tester.takeException()) {}
+      } catch (_) {}
       handle?.dispose();
       debugDisableShadows = previousShadows;
       debugDefaultTargetPlatformOverride = previousPlatform;

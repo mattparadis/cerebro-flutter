@@ -273,7 +273,8 @@ lives in `test/ui_map/app_factory.dart` and `ui_map.yaml`, nothing in
   initial route; `map.json` records `redirected_to` and the audit skill
   reports the redirect once instead of auditing the login screen 20 times.
 
-Routes with `:params` need sample values in `ui_map.yaml`; screens that
+Routes with `:params` need sample values in `ui_map.yaml` (a list gives one
+capture per value, e.g. a live, a sold and a missing item); screens that
 hit the network or platform channels at build time will render their
 error/empty branch (no HTTP in `flutter test`).
 
@@ -364,12 +365,16 @@ themes: [light, dark]
 platforms: [android]        # android | ios
 text_scales: [1.0, 1.3]     # large-text variants get an __x1.3 id suffix
 settle_ms: 600              # fixed pumps; infinite spinners are fine
+drain_timers_ms: 120000     # fake time pumped after each capture so one-shot
+                            # timers (snack bars, fake backends) do not fail the test
 export_scale: 2             # PNG = logical size × 2
 min_tap_size: { android: 48, ios: 44 }   # per platform, or one number
 keyboard_inset: 300         # dp, for routes with keyboard: true
 locales: []                 # e.g. [en, it, ar]; others get an id suffix
 routes:
   "/notes/:id": { params: { id: "1" } }
+  "/items/:id": { params: { id: [i01, i07, nope] } }   # list = one capture per value;
+                                                      # variants/keyboard use the first
   "/notes":     { variants: ["?state=empty", "?state=loading", "?state=error"], scenarios: [empty] }
   "/login":     { keyboard: true }   # extra capture with the keyboard open (__kb)
   "/debug":     { skip: true }

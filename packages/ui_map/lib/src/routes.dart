@@ -160,14 +160,13 @@ List<ScreenTarget> expandTargets(List<RouteNode> tree, UiMapConfig config) {
       ));
       continue;
     }
-    var location = path;
     final missing = <String>[];
-    location = location.replaceAllMapped(RegExp(r':(\w+)'), (m) {
+    final keys = <String>[];
+    for (final m in RegExp(r':(\w+)').allMatches(path)) {
       final key = m.group(1)!;
-      final v = opts.params[key];
-      if (v == null) missing.add(key);
-      return v ?? m.group(0)!;
-    });
+      keys.add(key);
+      if (opts.params[key] == null || opts.params[key]!.isEmpty) missing.add(key);
+    }
     if (missing.isNotEmpty) {
       targets.add(ScreenTarget(
         routePath: path,
@@ -177,7 +176,21 @@ List<ScreenTarget> expandTargets(List<RouteNode> tree, UiMapConfig config) {
       ));
       continue;
     }
+    // Cartesian product of the param values; the first combination is primary.
+    var combos = <Map<String, String>>[{}];
+    for (final key in keys) {
+      combos = [
+        for (final c in combos)
+          for (final v in opts.params[key]!) {...c, key: v},
+      ];
+    }
+    String fill(Map<String, String> c) =>
+        path.replaceAllMapped(RegExp(r':(\w+)'), (m) => c[m.group(1)!]!);
+    final location = fill(combos.first);
     targets.add(ScreenTarget(routePath: path, routeName: r.name, location: location));
+    for (final c in combos.skip(1)) {
+      targets.add(ScreenTarget(routePath: path, routeName: r.name, location: fill(c)));
+    }
     for (final v in opts.variants) {
       final suffix = v.startsWith('?') ? v : '?$v';
       targets.add(ScreenTarget(routePath: path, routeName: r.name, location: '$location$suffix'));
@@ -202,7 +215,7 @@ String slugForLocation(String location) {
   if (s.startsWith('/')) s = s.substring(1);
   if (s.isEmpty) return 'root';
   final parts = s.split('?');
-  var slug = parts.first.replaceAll('/', '_');
+  var slug = parts.first.isEmpty ? 'root' : parts.first.replaceAll('/', '_');
   if (parts.length > 1 && parts[1].isNotEmpty) {
     slug += '__${parts[1].replaceAll('=', '-').replaceAll('&', '_')}';
   }

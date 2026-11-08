@@ -35,6 +35,11 @@ GoRouter _fixtureRouter() {
 }
 
 void main() {
+  _multiParamTests();
+  test('root variants keep the root prefix', () {
+    expect(slugForLocation('/?state=empty'), 'root__state-empty');
+    expect(slugForLocation('/'), 'root');
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('enumerateRoutes', () {
@@ -117,5 +122,21 @@ void main() {
       expect(slugForLocation('/a/b?x=1&y=2'), 'a_b__x-1_y-2');
       expect(slugForLocation('/weird path/ü'), 'weird-path_-');
     });
+  });
+}
+
+void _multiParamTests() {
+  test('list params expand to one target per combination, primary first', () {
+    final tree = treeFromPaths(['/items/:id', '/chat/:a/:b']);
+    final config = UiMapConfig(routes: {
+      '/items/:id': const RouteOptions(params: {'id': ['i1', 'i2']}, variants: ['?state=x'], keyboard: true),
+      '/chat/:a/:b': const RouteOptions(params: {'a': ['1', '2'], 'b': ['x', 'y']}),
+    });
+    final t = expandTargets(tree, config).where((t) => !t.skipped).toList();
+    final items = t.where((t) => t.routePath == '/items/:id').toList();
+    expect(items.map((t) => '${t.location}${t.keyboard ? '#kb' : ''}'),
+        ['/items/i1', '/items/i2', '/items/i1?state=x', '/items/i1#kb']);
+    final chat = t.where((t) => t.routePath == '/chat/:a/:b').map((t) => t.location);
+    expect(chat, ['/chat/1/x', '/chat/1/y', '/chat/2/x', '/chat/2/y']);
   });
 }

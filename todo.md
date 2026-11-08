@@ -249,3 +249,17 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 - [ ] Mantenere l'uso di tema e convenzioni dell'app, consentendo correzioni motivate.
 - [ ] Mantenere prototipi distinti nella struttura e nei compromessi.
 - [ ] Mantenere report con evidenze, impatto per l'utente e correzioni Flutter concrete.
+
+## Da esperimento Rigattiere (2026-11-08, A senza skill vs B con skill)
+
+Vedi `experiments/rigattiere-results.md`.
+
+- [ ] La skill design-screen non dice come installare ui_map in un progetto nuovo (dipendenza path/git, `init`, factory): l'agent B si e' costruito un harness suo con Roboto al posto delle font vere. Aggiungere un passo "setup ui_map" esplicito con i comandi, e fallback dichiarato se il pacchetto non e' raggiungibile.
+- [ ] Le skill dovrebbero chiedere di bundlare i font (asset) invece di google_fonts a runtime quando la tipografia e' parte del brief: B ha verificato la tipografia con la font sbagliata.
+- [ ] ui_map: un tappable tagliato dal bordo del viewport (chip sotto la tastiera, campo in fondo) viene segnalato come "piccolo". Marcare `clipped: true` e non contarlo in `tappables_below_min`.
+- [ ] ui_map: testo coperto da FAB/CTA sticky viene misurato contro il colore del bottone (ratio ~1.0). Rilevare l'occlusione (il rect del testo interseca un tappable sovrastante) e classificare `occluded` invece di `low_contrast`; segnalare a parte "contenuto sotto FAB senza padding".
+- [ ] ui_map explore: un `error` edge salva solo la prima riga dell'eccezione. Salvare anche i primi frame dello stack in `results/<id>.json` (qui e' servito un test manuale per capire che era `ScrollController.jumpTo` su Browse offstage).
+- [ ] Il bug `jumpTo` su schermata offstage (notifier ascoltato da Browse mentre e' sotto un'altra route) e' uscito identico in A e B: aggiungere un anti-pattern "non toccare ScrollController/FocusNode da listener quando la route non e' corrente" in anti-patterns.md e una regola lint euristica (`jumpTo`/`animateTo` dentro un listener senza `hasClients`/`ModalRoute.isCurrent`).
+- [x] ui_map: `params` accetta una lista di valori (una cattura per valore).
+- [x] ui_map: `drain_timers_ms` pompa il tempo finto a fine cattura cosi' i timer one-shot (snackbar, backend finto) non fanno fallire il test.
+- [x] ui_map: le varianti di `/` avevano id senza prefisso (`__state-empty`); ora `root__state-empty`.

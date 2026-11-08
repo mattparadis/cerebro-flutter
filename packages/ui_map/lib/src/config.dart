@@ -45,7 +45,10 @@ class RouteOptions {
   });
 
   /// Values substituted for `:param` segments.
-  final Map<String, String> params;
+  /// Param name -> one or more values. The first value is the primary one
+  /// (variants, scenarios and keyboard captures are made for it only); the
+  /// others add one plain capture each.
+  final Map<String, List<String>> params;
 
   /// Navigator 1.0 only: `Navigator.pushNamed(..., arguments:)` payload
   /// (a YAML map/list/scalar) used when the factory gives none.
@@ -74,6 +77,7 @@ class UiMapConfig {
     this.platforms = const ['android'],
     this.textScales = const [1.0],
     this.settleMs = 600,
+    this.drainTimersMs = 120000,
     this.realAsyncMs = 0,
     this.exportScale = 2,
     this.minTapSize = 48,
@@ -99,6 +103,12 @@ class UiMapConfig {
   /// suffix for scales other than 1.0.
   final List<double> textScales;
   final int settleMs;
+
+  /// Fake time pumped at the end of each capture, with the tree still mounted,
+  /// so one-shot timers started by the screen or by explore taps (snack bars,
+  /// fake-backend delays) fire; flutter_test fails a test ending with a
+  /// pending timer. Periodic timers never drain: those are leaks to fix.
+  final int drainTimersMs;
 
   /// When > 0, after the settle pumps the harness waits this many real
   /// milliseconds inside `tester.runAsync` and pumps again, so that real
@@ -178,7 +188,8 @@ class UiMapConfig {
         }
         routes['${entry.key}'] = RouteOptions(
           params: {
-            for (final p in ((v['params'] as Map?) ?? {}).entries) '${p.key}': '${p.value}',
+            for (final p in ((v['params'] as Map?) ?? {}).entries)
+              '${p.key}': p.value is List ? [for (final x in p.value as List) '$x'] : ['${p.value}'],
           },
           variants: [for (final s in (v['variants'] as List?) ?? []) '$s'],
           skip: v['skip'] == true,
@@ -201,6 +212,7 @@ class UiMapConfig {
       platforms: _strings(m['platforms']) ?? d.platforms,
       textScales: (m['text_scales'] as List?)?.map((e) => (e as num).toDouble()).toList() ?? d.textScales,
       settleMs: (m['settle_ms'] as num?)?.toInt() ?? d.settleMs,
+      drainTimersMs: (m['drain_timers_ms'] as num?)?.toInt() ?? d.drainTimersMs,
       realAsyncMs: (m['real_async_ms'] as num?)?.toInt() ?? d.realAsyncMs,
       exportScale: (m['export_scale'] as num?)?.toDouble() ?? d.exportScale,
       minTapSize: m['min_tap_size'] is num ? (m['min_tap_size'] as num).toDouble() : d.minTapSize,
@@ -229,6 +241,7 @@ class UiMapConfig {
         'platforms': platforms,
         'text_scales': textScales,
         'settle_ms': settleMs,
+        'drain_timers_ms': drainTimersMs,
         'real_async_ms': realAsyncMs,
         'export_scale': exportScale,
         'min_tap_size': minTapSize,

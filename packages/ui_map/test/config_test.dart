@@ -61,7 +61,7 @@ lint:
     expect(c.minTapSizeFor('android'), 48);
     expect(c.keyboardInset, 260);
     expect(c.locales, ['en', 'it']);
-    expect(c.routes['/items/:id']!.params, {'id': '42'});
+    expect(c.routes['/items/:id']!.params, {'id': ['42']});
     expect(c.routes['/items']!.variants, ['?state=empty']);
     expect(c.routes['/debug']!.skip, isTrue);
     expect(c.exclude, ['/secret']);
