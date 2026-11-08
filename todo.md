@@ -263,3 +263,7 @@ Vedi `experiments/rigattiere-results.md`.
 - [x] ui_map: `params` accetta una lista di valori (una cattura per valore).
 - [x] ui_map: `drain_timers_ms` pompa il tempo finto a fine cattura cosi' i timer one-shot (snackbar, backend finto) non fanno fallire il test.
 - [x] ui_map: le varianti di `/` avevano id senza prefisso (`__state-empty`); ora `root__state-empty`.
+- [ ] ui_map: `fonts:` non accetta asset key di pacchetto (`packages/<pkg>/fonts/x.ttf`); risolverli via `.dart_tool/package_config.json` → `<pkg>/lib/<path>` (segnalato dall'agent B2).
+- [ ] ui_map: con `--config` fuori dal progetto, `out_dir` relativo viene risolto rispetto alla cartella del config invece che alla root del progetto.
+- [ ] ui_map: un Radio/Checkbox senza label accanto a una riga di testo risulta "unlabeled 40×40" + riga 21 dp: suggerire nel report "unire in un solo target con label" (RadioListTile) invece di due finding separati.
+- [ ] Skill trigger: B2 ha usato la skill solo con la riga esplicita nel prompt; da testare un run senza quella riga con la nuova descrizione.

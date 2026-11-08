@@ -1,5 +1,9 @@
 # Rigattiere A/B: results
 
+> **Update, same day:** run B never invoked the skills (see "Run B2" at the
+> end). The A-vs-B comparison below is therefore two no-skill runs; the
+> valid skills-plus-tool run is B2.
+
 Two headless Claude Code runs (Opus 5.5, same prompt in `prompt.txt`, same
 empty `flutter create` project, 2026-11-08). **A** had no skills and no tool.
 **B** had `skills/` linked as `.claude/skills` and `.agents/skills`, nothing
@@ -107,3 +111,68 @@ either run. Fixes are in `todo.md`.
 Reproduce: `claude --resume 2d56ebb4-ef2a-40a0-a001-1eb07ff9b333` in
 `~/code/rigattiere-a`, `claude --resume 19f25c77-c7da-48d1-a37b-4bc4f76d35c2`
 in `~/code/rigattiere-b`.
+
+
+## Run B2: the valid skills + tool run
+
+Run B's transcript shows no `SKILL.md` read, no Skill call and no mention
+of ui_map in 165 turns: the skills were listed in its context but the
+`design-screen` description only matched single-screen requests. Two fixes
+(commit `5eebe52`): the description now triggers on whole-app briefs, and
+a setup section tells the agent how to add and scaffold ui_map. B2 ran on
+a fresh project with the skills linked, `ui_map` already a path dev
+dependency, and three extra prompt lines saying the skills and ui_map are
+installed (`prompt-b2.txt`).
+
+| | A | B | **B2** |
+|---|---|---|---|
+| Wall time / cost / turns | 24 min / $6.25 / 133 | 29 min / $8.06 / 165 | 29 min / $7.32 / 156 |
+| Invoked design-screen | no | no | **yes (build mode)** |
+| Ran ui_map itself | no | no | **yes: 256 captures, 2 devices, explore, lint** |
+| Own flow tests (verified) | 67 | 98 | 17 (+256 capture tests) |
+| Fonts | bundled from gallery assets | google_fonts at runtime | bundled from gallery assets, loaded in the factory |
+| Settings | own page | bottom sheet | inline on Profile |
+| Extra screen | none | none | Messages inbox at `/chat` (justified: deep-linked chats need a back target) |
+
+Standard ui_map config (one phone, light/dark, 1.0/1.3, keyboard on sell
+and chat, explore), 92 captures for B2 vs 88 for A and B:
+
+| | A | B | **B2** |
+|---|---|---|---|
+| screens with tappables < 48 dp | 28 | 14 | 22 |
+| screens with low contrast | 16 | 20 | 13 |
+| error edges (exceptions on tap) | 1 | 1 | **0** |
+| no observed effect taps | 10 | 13 | 19 |
+
+B2 findings:
+- confirmed: the Condition picker on `/sell` is a radio (40×40 dp,
+  unlabeled) next to a 21 dp text row; the row should be one labelled
+  48 dp target. This is where most of B2's small-target count comes from.
+- confirmed: muted meta on the item screen at 1.3× is 2.55–2.97:1
+  ("yesterday", "Bikes", "FROM THE SELLER"); "Log out" 3.86:1.
+- no offstage-scroll bug: Browse keeps filter and scroll through
+  `AppScope` without touching the controller from a listener.
+- no-effect taps are all "already selected" controls (theme segment,
+  current tab) and the "All" chip; acceptable, A and B had the same.
+- Sticky "Post item" CTA stays visible with the keyboard open; sold item
+  gets a struck price, a stamp and a "More <category>" button; the offer
+  panel explains the declined amount and the allowed range; the seller
+  side shows "You're asking €45" next to the offer. Copy is the most
+  consistent of the three (sheet in `rigattiere/sheet4-a-b-b2.jpg`).
+- B2 reported a real ui_map limitation: `fonts:` cannot take package asset
+  keys, so it loaded the fonts itself in the factory. Also found while
+  evaluating: with `--config` outside the project, `out_dir` resolves
+  against the config file's folder, not the project.
+
+Verdict after B2: with the skill actually triggered, the agent set up the
+capture loop on its own, checked two phone sizes and 1.3× text, ran lint,
+produced the only run with zero tap exceptions and the lowest contrast
+count, and spent less than B. The visual direction is still mostly the
+prompt's; what the skill added is process (states by URL, flow contract
+tests that were mutation-checked, capture evidence) and a few conventions
+(one stamp per screen, display face only for prices and short titles).
+Remaining gap is the skill's own trigger reliability without the explicit
+"use the skills" line, which this run did not test.
+
+Session: `claude --resume c52ab8ed-cf81-4dc3-a5d8-5d3ce4e3ba9e` in
+`~/code/rigattiere-b2`.
