@@ -74,3 +74,18 @@ When a signal is kept on purpose, say why in the brief.
 5. Is there an empty, loading and error design, each reachable by URL?
 6. Is the way back obvious, and is the primary action the only filled
    button?
+
+## Motion that never happens
+
+- Pages that appear with no transition on Android or iOS. Typical cause:
+  go_router `builder:` routes resolved to `NoTransitionPage` because the
+  app type was not detected, or a `PageTransitionsTheme` set to none.
+  Signal: ui_map explore shows `transition: instant` on `push`/`pop`
+  edges. Fix: `pageBuilder` with `MaterialPage`/`CupertinoPage` (or a
+  `CustomTransitionPage`), an explicit `PageTransitionsTheme`, and a
+  widget test asserting `ModalRoute.transitionDuration > 0`.
+- A state the user caused (sent, accepted, saved, removed) that flips
+  with no motion while the rest of the screen moves. Signal: `instant`
+  state_change edge on the screen's main action.
+- Motion with no cause: looping shimmer on loaded content, pulsing
+  buttons. Signal: `continuous` on a screen that is not loading.

@@ -18,10 +18,11 @@ Two modes:
 
 **Starting from a brief, prototype first.** A new app, or a new screen
 with no sibling in the app to inherit from, goes through prototype mode
-for its key screens before any build: the two or three screens that carry
-the product (typically the list, the detail and the main action), two or
-three directions each, rendered side by side by ui_map (`.ui-map/PROTO.md`
-and `.ui-map/proto/<name>.png`). Then build the chosen direction and derive
+for its key screens before any build. Key screens means **three**: the
+list (what the user scans), the detail (what they decide on) and the main
+action (what they fill in or send); prototyping only the list is not the
+step. Two or three directions each, rendered side by side by ui_map
+(`.ui-map/PROTO.md` and `.ui-map/proto/<name>.png`). Then build the chosen direction and derive
 the remaining screens from it. Skip the prototype step only when the person
 says so, or when the screen is a variant of one the app already has. When a
 request names one mode explicitly, follow it.

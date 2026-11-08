@@ -176,3 +176,70 @@ Remaining gap is the skill's own trigger reliability without the explicit
 
 Session: `claude --resume c52ab8ed-cf81-4dc3-a5d8-5d3ce4e3ba9e` in
 `~/code/rigattiere-b2`.
+
+
+## Run B3: prototype-first, motion contract, fonts from the network
+
+After B2 the person's verdict was "not that different from A, settings a
+bit nicer, no animations anywhere". Three changes (commit `49c2dc4`):
+prototype mode is now mandatory when starting from a brief, the brief has
+a motion contract and `patterns.md` a Motion section, and ui_map's
+explore records per-edge `transition` evidence (frames sampled every
+50 ms with the tapped rect masked). B3 ran on a fresh project with the
+skills, ui_map as a path dependency, `curl` allowed and one prompt line
+saying fonts can be downloaded (`prompt-b3.txt`).
+
+| | B2 | **B3** |
+|---|---|---|
+| Wall time / cost / turns | 29 min / $7.32 / 156 | 32 min / $9.60 / 199 |
+| Prototype step | none | **Browse: 3 directions** (list / big-photo feed / grid), scored in DESIGN.md, sheet in `rigattiere/b3-proto-browse.jpg`; detail and sell were not prototyped |
+| Fonts | gallery-assets stand-ins | **Bricolage Grotesque + Atkinson Hyperlegible Next, downloaded and bundled** |
+| Own capture | 256 screens, 2 devices | 104 screens, explore, lint, `audit/SUMMARY.md` |
+| Own tests | 17 flow | 23 flow + **a regression test that pushes animate** |
+| Navigation | nested routes only | **bottom bar** Browse / Messages / Profile with badge |
+| Bugs its loop caught | scroll-to-error no-op | **every push/pop instant**, off-screen fields escaping validation, chips without the font |
+
+Standard config (one phone, light/dark, 1.0/1.3, keyboard, explore), all
+four runs re-captured with the same ui_map build:
+
+| | A | B | B2 | **B3** |
+|---|---|---|---|---|
+| captures | 88 | 88 | 92 | 96 |
+| screens with tappables < 48 dp | 28 | 14 | 22 | 14 |
+| screens with low contrast | 16 | 20 | 13 | 19 |
+| error edges | 1 | 1 | 0 | 0 |
+| navigation edges animated / instant | 0 / 40 | 0 / 43 | 9 / 48 | **45 / 5** |
+| state changes animated / instant | 37 / 46 | 14 / 55 | 16 / 66 | 38 / 60 |
+| continuous (still moving after 600 ms) | 10 | 9 | 1 | 2 |
+
+Reading the motion row: in A, B and B2 **no page transition ever ran**.
+go_router built `NoTransitionPage` for their `builder:` routes (B2's nine
+animated edges are its one explicit `MaterialPage`); none of the agents
+noticed because nothing showed it. B3's own capture showed `instant` on
+every push, it switched to explicit `MaterialPage`s, set a
+`PageTransitionsTheme`, and wrote a regression test. The 60 instant
+state changes in B3 are mostly field focus, chip selection and toggles
+whose own animation sits inside the masked rect, plus bookmark toggles
+that could animate. `continuous` in A and B are the offer-expiry
+countdowns and skeletons left running.
+
+B3 findings (standard capture):
+- confirmed: the `€` sign and helper text on the Sell form at 2.7-3.2:1;
+  muted price-tag euro sign at 2.71:1 against 3.0 required.
+- suspected: "Flaws, measurements…" placeholder and the counter at 1.17:1
+  are the field under the sticky CTA (occlusion, see tool notes).
+- small targets are clipped chips and fields at the viewport edge, plus
+  "Post another item" at 42 dp.
+- no error edges; Discard-style deep-link pops handled.
+
+Verdict after B3: the prototype step and the motion evidence changed the
+outcome in ways the first three runs could not: a layout chosen among
+three rendered alternatives, real typography, page transitions that
+exist and are tested, a bottom bar that makes the inbox reachable.
+Cost went up by about a third. Still open: the skill asked for three key
+screens and the agent prototyped one (now spelled out in the skill), and
+the comparison is one run per arm, so run-to-run variance is not
+controlled. Sheet: `rigattiere/sheet5-a-b-b2-b3.jpg`.
+
+Session: `claude --resume 6cf5cb54-1484-4fbe-af3c-f7786da790dc` in
+`~/code/rigattiere-b3`.

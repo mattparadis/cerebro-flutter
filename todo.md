@@ -267,3 +267,11 @@ Vedi `experiments/rigattiere-results.md`.
 - [ ] ui_map: con `--config` fuori dal progetto, `out_dir` relativo viene risolto rispetto alla cartella del config invece che alla root del progetto.
 - [ ] ui_map: un Radio/Checkbox senza label accanto a una riga di testo risulta "unlabeled 40×40" + riga 21 dp: suggerire nel report "unire in un solo target con label" (RadioListTile) invece di due finding separati.
 - [ ] Skill trigger: B2 ha usato la skill solo con la riga esplicita nel prompt; da testare un run senza quella riga con la nuova descrizione.
+
+## Da B3 (2026-11-08)
+
+- [ ] ui_map: il flag `clipped` per i tappable tagliati dal bordo del viewport e' ora la fonte principale di falsi positivi in tutti e quattro i run (chip sotto la tastiera, campi in fondo): priorita' alta.
+- [ ] ui_map: l'animazione interna al controllo toccato (switch, chip, bookmark) e' mascherata, quindi risulta `instant`. Aggiungere una seconda misura "self" sul solo rect toccato, cosi' un toggle senza animazione si distingue da uno animato.
+- [ ] Lint: `GoRoute(builder:)` senza `pageBuilder` e senza `PageTransitionsTheme` esplicito → info "verifica le transizioni (ui_map transition)"; in A, B e B2 go_router ha costruito `NoTransitionPage` e nessun agent se n'e' accorto.
+- [ ] Skill: B3 ha prototipato solo Browse; la skill ora dice "tre schermate: lista, dettaglio, azione principale". Verificare al prossimo run.
+- [ ] Esperimento: una sola esecuzione per braccio; per un confronto serio servono 2-3 run per configurazione o almeno un secondo B3.
