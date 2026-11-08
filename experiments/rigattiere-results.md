@@ -243,3 +243,63 @@ controlled. Sheet: `rigattiere/sheet5-a-b-b2-b3.jpg`.
 
 Session: `claude --resume 6cf5cb54-1484-4fbe-af3c-f7786da790dc` in
 `~/code/rigattiere-b3`.
+
+
+## Runs B3b and B3n: variance and natural triggering
+
+Two more runs after two measurement fixes in ui_map (`clipped` targets,
+`occluded` texts, commit `1a91171`): **B3b** repeats B3's prompt exactly;
+**B3n** drops the "skills are installed, use them" lines and keeps only
+the network note. Fresh projects, same model and permissions.
+
+| | B3 | B3b | B3n |
+|---|---|---|---|
+| Wall time / cost / turns | 32 min / $9.60 / 199 | 33 min / $9.47 / 205 | 33 min / $9.68 / 203 |
+| Skill invoked | yes (hinted) | yes (hinted) | **yes, by itself, after 10 s, no hint** |
+| Prototyped screens | Browse only | **Browse, detail, sell** (3+2+2) | **Browse, detail, sell** (3+2+2) |
+| Fonts bundled | Bricolage Grotesque + Atkinson Next | Fraunces + Atkinson Next | Big Shoulders Display + Atkinson |
+| Bottom bar | yes | yes | no (chats from item and My listings) |
+| Own flow tests | 23 | 16 | 16 |
+| Bugs its loop caught | instant pushes, validation gap, chip font | invisible chip labels, accent on secondary buttons, faint disabled button, hidden composer | 800 ms default transition replaced by 300 ms, 14 occluded texts recognised as hidden |
+
+Standard config, all six runs captured with the final ui_map (clipped and
+occluded classes applied uniformly):
+
+| | A | B | B2 | B3 | B3b | B3n |
+|---|---|---|---|---|---|---|
+| captures | 88 | 88 | 92 | 96 | 92 | 92 |
+| screens with real tappables < 48 dp | **28** | 0 | 0 | 0 | 0 | 0 |
+| screens with clipped tappables (not findings) | 18 | 14 | 22 | 14 | 12 | 18 |
+| screens with real low contrast | 6 | **16** | 6 | 5 | 3 | 2 |
+| occluded texts (not findings) | 21 | 4 | 13 | 22 | 18 | 22 |
+| error edges | 1 | 1 | 0 | 0 | 0 | 0 |
+| navigation animated / instant | 0 / 40 | 0 / 43 | 9 / 48 | 45 / 5 | 43 / 5 | **46 / 0** |
+| state changes animated / instant | 37 / 46 | 14 / 55 | 16 / 66 | 38 / 60 | 16 / 74 | 35 / 68 |
+| continuous after 600 ms | 10 | 9 | 1 | 2 | 0 | 0 |
+
+With the two measurement classes applied, the picture is cleaner than in
+the earlier tables: A's 40 dp chips are the only real small-target defect
+in the whole experiment, B's muted declined text is the only run with
+double-digit contrast failures, and only the B3 family has page
+transitions. The remaining contrast findings in B3/B3b/B3n are a handful
+of 3.2-4.0:1 labels each.
+
+What the two extra runs settle:
+- **Trigger:** the broadened description fires on a whole-app brief
+  without being told (one data point, but a clean one).
+- **Prototype step:** with "three screens" spelled out, both runs did all
+  three with structurally different directions (list / grid / feed;
+  photo-first / title-first detail; one-page / three-step sell). Sheets:
+  `rigattiere/b3b-b3n-protos-light.jpg`.
+- **Variance:** structure and process are stable across the three B3 runs
+  (classified rows, price first, one stamp, offer slip, CTA with the price,
+  animated pushes, zero tap exceptions, zero real small targets). What
+  varies is typography (three different display faces from the same brief
+  line) and one navigation decision (bottom bar or not). Cost is stable
+  at $9.5-9.7 and 32-33 min.
+- **Honest limit:** three runs of one arm against one run each of the
+  others; the no-skill arm was never re-run with network access, so the
+  typography gap partly measures the font rule, not the skills.
+
+Sheet: `rigattiere/sheet6-a-b3-b3b-b3n.jpg`. Sessions:
+`1e3be76e-c160-42d7-af6f-5b3e6d856b86` (B3b), `a09a8541-3993-4b46-bb9c-c3230a2bfb6b` (B3n).

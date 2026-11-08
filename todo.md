@@ -256,8 +256,8 @@ Vedi `experiments/rigattiere-results.md`.
 
 - [ ] La skill design-screen non dice come installare ui_map in un progetto nuovo (dipendenza path/git, `init`, factory): l'agent B si e' costruito un harness suo con Roboto al posto delle font vere. Aggiungere un passo "setup ui_map" esplicito con i comandi, e fallback dichiarato se il pacchetto non e' raggiungibile.
 - [ ] Le skill dovrebbero chiedere di bundlare i font (asset) invece di google_fonts a runtime quando la tipografia e' parte del brief: B ha verificato la tipografia con la font sbagliata.
-- [ ] ui_map: un tappable tagliato dal bordo del viewport (chip sotto la tastiera, campo in fondo) viene segnalato come "piccolo". Marcare `clipped: true` e non contarlo in `tappables_below_min`.
-- [ ] ui_map: testo coperto da FAB/CTA sticky viene misurato contro il colore del bottone (ratio ~1.0). Rilevare l'occlusione (il rect del testo interseca un tappable sovrastante) e classificare `occluded` invece di `low_contrast`; segnalare a parte "contenuto sotto FAB senza padding".
+- [x] ui_map: un tappable tagliato dal bordo del viewport (chip sotto la tastiera, campo in fondo) viene segnalato come "piccolo". Marcare `clipped: true` e non contarlo in `tappables_below_min`.
+- [x] ui_map: testo coperto da FAB/CTA sticky viene misurato contro il colore del bottone (ratio ~1.0). Rilevare l'occlusione (il rect del testo interseca un tappable sovrastante) e classificare `occluded` invece di `low_contrast`; segnalare a parte "contenuto sotto FAB senza padding".
 - [ ] ui_map explore: un `error` edge salva solo la prima riga dell'eccezione. Salvare anche i primi frame dello stack in `results/<id>.json` (qui e' servito un test manuale per capire che era `ScrollController.jumpTo` su Browse offstage).
 - [ ] Il bug `jumpTo` su schermata offstage (notifier ascoltato da Browse mentre e' sotto un'altra route) e' uscito identico in A e B: aggiungere un anti-pattern "non toccare ScrollController/FocusNode da listener quando la route non e' corrente" in anti-patterns.md e una regola lint euristica (`jumpTo`/`animateTo` dentro un listener senza `hasClients`/`ModalRoute.isCurrent`).
 - [x] ui_map: `params` accetta una lista di valori (una cattura per valore).
@@ -266,12 +266,14 @@ Vedi `experiments/rigattiere-results.md`.
 - [ ] ui_map: `fonts:` non accetta asset key di pacchetto (`packages/<pkg>/fonts/x.ttf`); risolverli via `.dart_tool/package_config.json` → `<pkg>/lib/<path>` (segnalato dall'agent B2).
 - [ ] ui_map: con `--config` fuori dal progetto, `out_dir` relativo viene risolto rispetto alla cartella del config invece che alla root del progetto.
 - [ ] ui_map: un Radio/Checkbox senza label accanto a una riga di testo risulta "unlabeled 40×40" + riga 21 dp: suggerire nel report "unire in un solo target con label" (RadioListTile) invece di due finding separati.
-- [ ] Skill trigger: B2 ha usato la skill solo con la riga esplicita nel prompt; da testare un run senza quella riga con la nuova descrizione.
+- [x] Skill trigger: B2 ha usato la skill solo con la riga esplicita (B3n: scatta da sola) nel prompt; da testare un run senza quella riga con la nuova descrizione.
 
 ## Da B3 (2026-11-08)
 
-- [ ] ui_map: il flag `clipped` per i tappable tagliati dal bordo del viewport e' ora la fonte principale di falsi positivi in tutti e quattro i run (chip sotto la tastiera, campi in fondo): priorita' alta.
-- [ ] ui_map: l'animazione interna al controllo toccato (switch, chip, bookmark) e' mascherata, quindi risulta `instant`. Aggiungere una seconda misura "self" sul solo rect toccato, cosi' un toggle senza animazione si distingue da uno animato.
+- [x] ui_map: il flag `clipped` per i tappable tagliati dal bordo del viewport e' ora la fonte principale di falsi positivi in tutti e quattro i run (chip sotto la tastiera, campi in fondo): priorita' alta.
+- [x] ui_map: l'animazione interna al controllo toccato (`self_transition`) (switch, chip, bookmark) e' mascherata, quindi risulta `instant`. Aggiungere una seconda misura "self" sul solo rect toccato, cosi' un toggle senza animazione si distingue da uno animato.
 - [ ] Lint: `GoRoute(builder:)` senza `pageBuilder` e senza `PageTransitionsTheme` esplicito → info "verifica le transizioni (ui_map transition)"; in A, B e B2 go_router ha costruito `NoTransitionPage` e nessun agent se n'e' accorto.
-- [ ] Skill: B3 ha prototipato solo Browse; la skill ora dice "tre schermate: lista, dettaglio, azione principale". Verificare al prossimo run.
-- [ ] Esperimento: una sola esecuzione per braccio; per un confronto serio servono 2-3 run per configurazione o almeno un secondo B3.
+- [x] Skill: B3 ha prototipato solo Browse (B3b e B3n: tre schermate); la skill ora dice "tre schermate: lista, dettaglio, azione principale". Verificare al prossimo run.
+- [x] Esperimento: una sola esecuzione per braccio (B3, B3b, B3n: struttura stabile, tipografia variabile); per un confronto serio servono 2-3 run per configurazione o almeno un secondo B3.
+- [ ] ui_map occlusione: un testo sotto una barra fissa NON tappabile (Container opaco) non viene riconosciuto (B3n ne ha contati 14 a mano). Idea: campionare il colore del rect del testo in due frame con scroll diverso, o confrontare il colore dominante con quello delle superfici note del tema.
+- [ ] Esperimento: ripetere il braccio "senza skill" con rete abilitata (A2), per separare l'effetto delle font da quello delle skill.
