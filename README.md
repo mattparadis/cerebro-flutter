@@ -161,8 +161,13 @@ Then, in the same directory, ask Claude Code or Codex:
 The skill is discovered through `.claude/skills` and `.agents/skills`
 symlinks in the demo app. The planted defects it should find: a 32×32 dp
 icon button on Settings, a `#BDBDBD` caption on the notes list, a hardcoded
-light background on the paywall that stays light in dark mode, and
-onboarding content without `SafeArea`.
+light background on the paywall that stays light in dark mode, onboarding
+content without `SafeArea`, and a login form that overflows by 68 px when
+the keyboard is open (visible only in the `__kb` capture). The note
+creation flow, on the other hand, is a worked example of a flow contract:
+`test/flows/create_note_flow_test.dart` proves persistence, in-flight
+protection, error + retry and discard confirmation against the in-memory
+repository.
 
 ## Install in your own app
 

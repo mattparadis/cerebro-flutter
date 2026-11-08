@@ -92,6 +92,15 @@ NOTICE.
 30. Destructive actions ask for confirmation or offer undo (judge from
     visible labels like Delete / Discard).
 31. Success and progress feedback visible where the user acts (Save, Send).
+31b. In-flight protection: the primary action disables (with a spinner)
+    while a request runs, so a double tap cannot submit twice; judge from
+    the source when no in-flight capture exists (`not_checked` otherwise).
+31c. Unsaved changes: leaving a dirty form asks to discard or keeps a
+    draft (explore: a `pop` edge on Back/Close from a form with no dialog
+    overlay is a `suspected` finding).
+31d. Return path: after an action the user lands where its result is
+    visible (new item in the list, updated balance), with filters and
+    scroll preserved; after login from a deep link, on the deep link.
 
 ## F. Navigation and platform idiom
 

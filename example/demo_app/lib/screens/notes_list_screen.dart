@@ -43,7 +43,17 @@ class _NotesListScreenState extends State<NotesListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/notes/new'),
+        onPressed: () async {
+          final created = await context.push<Note>('/notes/new');
+          if (created != null && mounted) {
+            setState(() {
+              _future = const NotesRepository().list(widget.state);
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Saved "${created.title}"')),
+            );
+          }
+        },
         icon: const Icon(Icons.add),
         label: const Text('New note'),
       ),

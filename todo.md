@@ -2,7 +2,7 @@
 
 Obiettivo: guidare la creazione di applicazioni Flutter curate nel design e corrette nei comportamenti UI/UX, con verifiche che distinguano ciò che è dimostrato da ciò che resta da controllare.
 
-Questo documento raccoglie i problemi della review, le soluzioni proposte e i criteri per considerarli risolti. Le attività non sono ancora implementate.
+Questo documento raccoglie i problemi della review, le soluzioni proposte e i criteri per considerarli risolti. Stato al 2026-11-08: tutti e dieci i punti implementati nella forma indicata accanto a ciascuno; le parti rimandate sono elencate in ogni nota.
 
 ## Evidenze della review
 
@@ -114,7 +114,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 5. Aggiungere contratti di comportamento ai flussi
 
-- [ ] Estendere il brief e il build mode oltre stati statici e destinazioni di navigazione.
+- [x] Estendere il brief e il build mode oltre stati statici e destinazioni di navigazione. *(fatto 2026-11-08: tabella "Flow contracts" in patterns.md e nel brief; passo 4b del build mode con widget test su fake osservabile; voci 31b-31d nella checklist; demo: flusso di creazione nota con persistenza, doppio tap bloccato, errore+retry, conferma allo scarto, 4 test in test/flows. Non fatto: flusso autenticato con ritorno al deep link, la demo non ha auth)*
 
 **Problema:** una schermata può essere corretta e un pulsante può navigare, mentre il compito dell'utente non viene completato. Un «Salva» che chiude senza persistere i dati non deve superare la verifica.
 
@@ -152,7 +152,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 7. Arricchire il brief con una direzione visiva motivata
 
-- [ ] Superare il solo punto di partenza seed color + gutter + componenti Material.
+- [x] Superare il solo punto di partenza seed color + gutter + componenti Material. *(fatto 2026-11-08: brief con pubblico, contesto, priorità, densità e carattere; convenzioni da preservare vs difetti da non propagare; riferimenti pertinenti; prototipi valutati sugli obiettivi dichiarati e con contenuti realistici; anti-pattern come segnali motivabili; Material 3 come default dichiarato)*
 
 **Problema:** le regole attuali favoriscono ordine e coerenza, ma possono produrre app visivamente simili. Evitare cliché non basta a costruire un'identità.
 

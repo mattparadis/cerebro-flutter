@@ -33,6 +33,40 @@ ListState parseState(String? raw) => switch (raw) {
 class NotesRepository {
   const NotesRepository();
 
+  /// In-memory store shared by all instances; the demo's "backend".
+  static final List<Note> _store = List.of(_notes);
+
+  /// Test seam: when true, the next [add] fails once (then succeeds), to
+  /// exercise the error + retry path of the creation flow.
+  static bool failNextAdd = false;
+
+  static void reset() {
+    _store
+      ..clear()
+      ..addAll(_notes);
+    failNextAdd = false;
+    scenarioOverride = null;
+  }
+
+  /// Persists a note at the top of the list. Simulates latency so the
+  /// in-flight state (disabled Save + spinner) is observable.
+  Future<Note> add({required String title, required String body}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (failNextAdd) {
+      failNextAdd = false;
+      throw StateError('Sync failed: the server returned 503.');
+    }
+    final note = Note(
+      id: '${_store.length + 1}',
+      title: title.trim(),
+      body: body.trim(),
+      tag: 'Field',
+      updated: 'Just now',
+    );
+    _store.insert(0, note);
+    return note;
+  }
+
   /// Test seam: when set, every list() ignores the requested state and uses
   /// this one. ui_map scenarios in test/ui_map/app_factory.dart set it to
   /// capture screens whose URL has no `?state=` hook.
@@ -95,13 +129,13 @@ class NotesRepository {
       case ListState.full:
         return Future<List<Note>>.delayed(
           const Duration(milliseconds: 200),
-          () => _notes,
+          () => List.unmodifiable(_store),
         );
     }
   }
 
   Note? byId(String id) {
-    for (final n in _notes) {
+    for (final n in _store) {
       if (n.id == id) return n;
     }
     return null;

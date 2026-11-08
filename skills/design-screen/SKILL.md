@@ -26,11 +26,19 @@ needs; do not paste them into the output.
 | `references/hig-cupertino.md` | Apple HIG essentials, Cupertino widgets, platform-adaptive strategy |
 | `references/anti-patterns.md` | what makes a screen look AI-generated or break on devices; checked before delivery |
 
-## 1. Brief (always, 5 lines max)
+## 1. Brief (always, short)
 
 Write these before any code, and show them to the person in the final
 message:
 
+0. **Who and where**: the audience (two or three traits that matter:
+   outdoors with gloves, one-handed on a commute, a clinician between
+   patients), the context of use, and what they must find first on this
+   screen (information priorities, top three). From these derive the
+   **density** (airy / standard / dense) and the **character** the app
+   already has or the brief asks for (quiet utility, warm consumer, data
+   heavy, playful), in one line each. Every visual choice below must point
+   back at one of these; a choice with no reason is a reflex.
 1. **Job**: one sentence, feature + job to be done. "Hard paywall after
    onboarding, annual default, exit visible."
 2. **Archetype** from `patterns.md` (list, detail, form, onboarding,
@@ -42,14 +50,32 @@ message:
    action leads to.
 5. **States**: default, empty, loading, error, plus any domain states.
    Each one must be designed, not just handled.
-6. **Coverage**: which devices, themes, platforms, text scales, locales
+6. **Flow contract** (for any screen where the user *does* something:
+   create, edit, pay, sign in, delete, filter): a table, one row per
+   action, from `references/patterns.md` → "Flow contracts":
+   situation → action → expected result → feedback → error and recovery.
+   Say where the state lives, when it is persisted, and what must survive
+   back, tab switch and reopening. Cover what applies: unsaved changes,
+   cancel, in-flight (disabled + spinner), double tap, error + retry,
+   duplicate prevention, scroll and filter preservation, permission
+   denied, auth that returns to the original deep link. A screen that
+   looks right while "Save" closes without persisting fails this contract.
+7. **Coverage**: which devices, themes, platforms, text scales, locales
    and keyboard-open screens the capture will run (`ui_map.yaml`); for a
    form, set `keyboard: true` on its route. What is not run is reported
    as not verified, never assumed.
 
-## 2. Inherit the app's conventions
+## 2. Inherit the app's conventions, not its defects
 
-Before designing, look at what exists:
+Before designing, look at what exists, and sort what you find into two
+lists: **conventions to keep** (gutter, type usage, component style,
+navigation chrome, tone of copy) and **defects not to propagate**
+(hardcoded colours, 36 dp chips, placeholder-only fields, a second accent
+colour). Copying a neighbouring screen verbatim carries its defects into
+the new one; say in the brief which of its traits you kept and which you
+corrected, and why. For a new app or a wide redesign, pick two or three
+pertinent references (apps your audience already uses for a similar job)
+and name the principles you take from them, not the pixels.
 
 - `.ui-map/MAP.md` and `map.json` if present (run `dart run ui_map capture`
   if the app is set up for it): open two or three neighbouring screens'
@@ -102,7 +128,10 @@ default broken on purpose is a decision; a requirement broken is a defect.
    as separate widgets (`<Name>ProtoA`, `ProtoB`, `ProtoC`), each a full
    `Scaffold`, using the app theme and fake data. Make the directions
    differ in **structure** (e.g. list vs cards vs grouped sections; sheet vs
-   page; hero image vs text-first), not just in colour.
+   page; hero image vs text-first), not just in colour, and make each one
+   serve a different reading of the brief's priorities (speed of the main
+   task vs overview vs recognisability). Use realistic content: long
+   names, an empty field, a 4-digit price, a 12-item list.
 2. Register one route guarded by a compile-time flag so the prototypes
    never ship:
 
@@ -136,7 +165,9 @@ default broken on purpose is a decision; a requirement broken is a defect.
    Open the PNGs yourself and reject any direction that breaks the rules
    in step 3 before showing it.
 5. Present: for each direction, the PNG path(s) (light and dark), two
-   lines on the idea and its trade-off. Recommend one. Ask the person to
+   lines on the idea and its trade-off, and how it scores against the
+   brief's goals (legibility, speed of the main task, density, fit with
+   the app, behaviour with real content). Recommend one. Ask the person to
    choose. Stop there.
 6. On a choice: build mode for that direction, then delete
    `lib/prototypes/<name>_proto.dart`, the guarded route and the yaml
@@ -169,6 +200,15 @@ default broken on purpose is a decision; a requirement broken is a defect.
    Fix anything of severity 3-4 (touch target, contrast, missing state,
    no way back, overflow) before presenting. Report `exceptions` from
    `map.json` as fixed, not as known issues.
+4b. Prove the flow contract, not just the screen. For the main action
+   write a widget test that drives it through an observable fake of the
+   data layer (an in-memory repository you can inspect): the action
+   persists what it should and the result is visible where the user will
+   look next (the new item in the list, the updated balance, the
+   confirmation); cancel leaves nothing behind; a second tap during the
+   in-flight state does nothing; a failing fake shows the error state and
+   retry succeeds. Put device-bound behaviour (real backend, plugins,
+   haptics) in the "needs a device" list, never in the verified one.
 5. `dart run ui_map lint` reports no `error` or `warning` in the new
    files; `convention` findings in them are either removed or justified
    with a `// ui_map: ignore <reason>` comment. `flutter analyze` clean;
@@ -176,7 +216,8 @@ default broken on purpose is a decision; a requirement broken is a defect.
 
 ## 5. Deliver
 
-Final message: the 5-line brief, files created or changed, the route and
-how to open it, the PNG paths, what was verified in the capture, and what
-cannot be verified headlessly (haptics, keyboard behaviour, real network,
-animations) and should be checked on a device. No code in the message.
+Final message: the brief, files created or changed, the route and how to
+open it, the PNG paths, what was verified in the capture, what the flow
+test proved **with fakes**, and what still needs a device or the real
+backend (haptics, real keyboard, network, animations, payments). Keep the
+two lists apart. No code in the message.

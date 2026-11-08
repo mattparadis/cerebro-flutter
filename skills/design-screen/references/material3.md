@@ -5,6 +5,13 @@ Source: https://m3.material.io (Material Design 3) and the Flutter
 default; `useMaterial3: true` is implied). Where M3 Expressive components
 are mentioned, check they exist in your Flutter version before using them.
 
+Everything here is a **default**: the fastest route to a coherent,
+accessible Material screen. The brief's audience, density and character
+decide where to depart from it (a denser type scale for a data app, a
+warmer palette with a second accent for a consumer app, larger targets
+for gloves). Departures are decisions written in the brief; the
+requirements (touch targets, contrast, labels, a way back) stay.
+
 ## Colour roles (use these, never literals)
 
 | Role | Use for |

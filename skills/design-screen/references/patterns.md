@@ -19,6 +19,30 @@ Checklist Design (MIT); see NOTICE.
 | **Dashboard** | summary tiles (max 4) · one chart · list of latest · period selector | drill-down | loaded, loading (skeleton tiles), empty period, error |
 | **Empty / first-run** | icon or illustration · title (what this is) · one line (what to do) · one action | the action | single |
 
+## Flow contracts
+
+A screen is correct when the user's task completes, not when the button
+navigates. For every action on the screen fill this table and keep it in
+the brief; the widget test in build mode follows it row by row.
+
+| Situation (state before) | Action | Expected result (where the user looks next) | Feedback | Error and recovery |
+|---|---|---|---|---|
+| Empty form | Save | nothing; errors shown inline, first invalid field focused | field errors | n/a |
+| Valid form | Save | item persisted; list shows it at the top; screen closes | snackbar "Saved" (undo if cheap) | repo fails → inline error, data kept, Retry re-submits |
+| Valid form, request in flight | Save again | nothing (button disabled, spinner) | spinner on the button | timeout → error state, no duplicate |
+| Dirty form | Back / Cancel | confirm discard, or keep a draft | dialog or sheet | n/a |
+| List with filter + scroll | Open item, then back | same filter, same scroll offset | none | n/a |
+| Logged out | Open deep link to a booking | login, then **the booking**, not home | none | login fails → stay on login with the deep link kept |
+| Permission denied | Tap "Use my location" | explanation + manual alternative (type a city) | inline | settings shortcut |
+
+Say explicitly: where the state lives (widget, controller, repository),
+when it is persisted (on each change, on Save, on leave), and what
+survives back, tab switch, background and reopen. Common failures the
+table catches: Save that pops without persisting; a double tap that
+creates two orders; a filter reset by navigation; a deep link that
+drops the user on home after login; an optimistic update never rolled
+back on error.
+
 ## State design rules
 
 - **Empty** is a screen, not a line: icon (`outline` colour), `titleLarge`,
