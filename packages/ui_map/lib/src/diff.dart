@@ -101,8 +101,15 @@ class CaptureDiff {
     final b = StringBuffer();
     b.writeln('# UI diff');
     b.writeln();
+    final regressions = changed.where((c) => c.isRegression).length;
+    final losses = changed.where((c) => c.hasCoverageLoss).length;
     b.writeln('Baseline ${baselineGeneratedAt ?? '?'} → current ${currentGeneratedAt ?? '?'} · '
-        '${changed.length} changed · ${added.length} added · ${removed.length} removed · $unchanged unchanged.');
+        '${changed.length} changed ($regressions regressions, $losses with coverage loss) · '
+        '${added.length} added · ${removed.length} removed · $unchanged unchanged.');
+    b.writeln();
+    b.writeln('Regression = a finding that was not in the baseline (by identity: label/text + size or '
+        'ratio), or a screen that stopped rendering. Coverage loss = something the baseline could '
+        'measure and this capture cannot. Visual/semantics = changed, judge it yourself.');
     b.writeln();
     if (!hasChanges) {
       b.writeln('No screen changed.');
@@ -111,11 +118,20 @@ class CaptureDiff {
     if (changed.isNotEmpty) {
       b.writeln('## Changed');
       b.writeln();
-      b.writeln('| Screen | What changed | Before | After |');
-      b.writeln('|---|---|---|---|');
+      b.writeln('| Screen | Class | What changed | Before | After |');
+      b.writeln('|---|---|---|---|---|');
       for (final c in changed) {
+        final cls = c.isRegression
+            ? '**regression**'
+            : c.hasCoverageLoss
+                ? 'coverage loss'
+                : c.fixedFindings.isNotEmpty
+                    ? 'improvement'
+                    : c.semantics
+                        ? 'semantics'
+                        : 'visual';
         b.writeln('| `${c.location}` · ${c.theme}${c.textScale == 1.0 ? '' : ' · ×${c.textScale}'} '
-            '| ${c.describe()} '
+            '| $cls | ${c.describe()} '
             '| ${_img(c.beforePng, 'before')} | ${_img(c.afterPng, 'after')} |');
       }
       b.writeln();
@@ -159,6 +175,9 @@ class ScreenChange {
     required this.smallTargetsAfter,
     required this.beforePng,
     required this.afterPng,
+    this.newFindings = const [],
+    this.fixedFindings = const [],
+    this.coverageLoss = const [],
   });
 
   final String id;
@@ -176,32 +195,39 @@ class ScreenChange {
   final String? beforePng;
   final String? afterPng;
 
-  /// Regressions first: errors, new exceptions, new small targets, then
-  /// semantics, then visual.
+  /// Findings present now and absent in the baseline, by stable identity
+  /// (kind + label/text + size or colours), not by count: a fixed defect
+  /// and a new one of the same kind still surface the new one.
+  final List<String> newFindings;
+  final List<String> fixedFindings;
+
+  /// Things the baseline could verify and the current capture cannot
+  /// (fewer texts measured, screen no longer rendering). Not a regression
+  /// of the app, but not a pass either.
+  final List<String> coverageLoss;
+
+  /// Regressions first, then coverage loss, then semantics, then visual.
   int get weight {
     var w = 0;
     if (statusAfter == 'error' && statusBefore != 'error') w += 100;
-    if (exceptionsAfter > exceptionsBefore) w += 50;
-    if (smallTargetsAfter > smallTargetsBefore) w += 40;
+    w += newFindings.length * 40;
+    w += coverageLoss.length * 20;
     if (semantics) w += 10;
     if (visual) w += 5;
     return w;
   }
 
   bool get isRegression =>
-      (statusAfter == 'error' && statusBefore != 'error') ||
-      exceptionsAfter > exceptionsBefore ||
-      smallTargetsAfter > smallTargetsBefore;
+      (statusAfter == 'error' && statusBefore != 'error') || newFindings.isNotEmpty;
+
+  bool get hasCoverageLoss => coverageLoss.isNotEmpty;
 
   String describe() {
     final parts = <String>[];
     if (statusAfter != statusBefore) parts.add('status $statusBefore → $statusAfter');
-    if (exceptionsAfter != exceptionsBefore) {
-      parts.add('layout exceptions $exceptionsBefore → $exceptionsAfter');
-    }
-    if (smallTargetsAfter != smallTargetsBefore) {
-      parts.add('small tap targets $smallTargetsBefore → $smallTargetsAfter');
-    }
+    if (newFindings.isNotEmpty) parts.add('new: ${newFindings.join(', ')}');
+    if (fixedFindings.isNotEmpty) parts.add('fixed: ${fixedFindings.join(', ')}');
+    if (coverageLoss.isNotEmpty) parts.add('coverage: ${coverageLoss.join(', ')}');
     if (semantics && visual) {
       parts.add('visual + semantics');
     } else if (semantics) {
@@ -223,6 +249,9 @@ class ScreenChange {
         'status': {'before': statusBefore, 'after': statusAfter},
         'exceptions': {'before': exceptionsBefore, 'after': exceptionsAfter},
         'tappables_below_min': {'before': smallTargetsBefore, 'after': smallTargetsAfter},
+        'new_findings': newFindings,
+        'fixed_findings': fixedFindings,
+        'coverage_loss': coverageLoss,
         'description': describe(),
         'before_png': beforePng,
         'after_png': afterPng,
@@ -241,7 +270,26 @@ class ScreenChange {
     final exA = ((after['exceptions'] as List?) ?? const []).length;
     final smB = ((before['tappables_below_min'] as List?) ?? const []).length;
     final smA = ((after['tappables_below_min'] as List?) ?? const []).length;
-    if (!visual && !semantics && statusBefore == statusAfter && exB == exA && smB == smA) {
+    final idsBefore = findingIds(before);
+    final idsAfter = findingIds(after);
+    final newFindings = idsAfter.keys.where((k) => !idsBefore.containsKey(k)).map((k) => idsAfter[k]!).toList();
+    final fixedFindings = idsBefore.keys.where((k) => !idsAfter.containsKey(k)).map((k) => idsBefore[k]!).toList();
+    final coverage = <String>[];
+    final covB = before['contrast_coverage'] as Map?;
+    final covA = after['contrast_coverage'] as Map?;
+    if (covB != null && covA != null) {
+      final mb = (covB['measured'] as num?) ?? 0, ma = (covA['measured'] as num?) ?? 0;
+      if (ma < mb) coverage.add('contrast measured $mb → $ma texts');
+    }
+    if (statusAfter == 'error' && statusBefore == 'ok') coverage.add('screen no longer renders');
+    if (!visual &&
+        !semantics &&
+        statusBefore == statusAfter &&
+        exB == exA &&
+        smB == smA &&
+        newFindings.isEmpty &&
+        fixedFindings.isEmpty &&
+        coverage.isEmpty) {
       return null;
     }
     return ScreenChange(
@@ -257,6 +305,9 @@ class ScreenChange {
       exceptionsAfter: exA,
       smallTargetsBefore: smB,
       smallTargetsAfter: smA,
+      newFindings: newFindings,
+      fixedFindings: fixedFindings,
+      coverageLoss: coverage,
       beforePng: before['png'] == null
           ? null
           : baselinePrefix == null
@@ -265,6 +316,32 @@ class ScreenChange {
       afterPng: after['png'] as String?,
     );
   }
+}
+
+/// Stable identities of a screen's deterministic findings, mapped to a
+/// short human label. Positions are left out so a layout shift does not
+/// fake a new finding; sizes, colours and ratios are in, so a worse
+/// contrast on the same text is a new finding.
+Map<String, String> findingIds(Map<String, Object?> screen) {
+  final out = <String, String>{};
+  for (final t in ((screen['tappables_below_min'] as List?) ?? const []).cast<Map>()) {
+    final key = 'target|${t['label']}|${(t['width'] as num?)?.round()}x${(t['height'] as num?)?.round()}';
+    out[key] = 'small target "${t['label']}" ${(t['width'] as num?)?.round()}×${(t['height'] as num?)?.round()}';
+  }
+  for (final c in ((screen['low_contrast'] as List?) ?? const []).cast<Map>()) {
+    final ratio = (c['ratio'] as num?)?.toDouble() ?? 0;
+    // bucket to 0.1 so sampling noise does not churn
+    final key = 'contrast|${c['text']}|${(ratio * 10).round()}';
+    out[key] = 'contrast "${c['text']}" ${ratio.toStringAsFixed(2)}:1';
+  }
+  for (final e in ((screen['exceptions'] as List?) ?? const []).cast<String>()) {
+    final head = e.length > 60 ? e.substring(0, 60) : e;
+    out['exception|$head'] = 'exception "$head"';
+  }
+  for (final e in ((screen['edges'] as List?) ?? const []).cast<Map>()) {
+    if (e['kind'] == 'error') out['edge-error|${e['label']}'] = 'tap "${e['label']}" errors';
+  }
+  return out;
 }
 
 /// Reads a `map.json` from a file path or from a directory containing one.

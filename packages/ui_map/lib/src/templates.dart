@@ -21,6 +21,20 @@ Widget buildApp(GoRouter router, {required ThemeMode themeMode}) {
   // TODO(ui_map): e.g. `return MyApp(router: router, themeMode: themeMode);`
   throw UnimplementedError('ui_map: fill in test/ui_map/app_factory.dart');
 }
+
+/// Optional: named fixtures the capture applies per route
+/// (`routes.<path>.scenarios: [empty, error]` or `default_scenario` in
+/// ui_map.yaml). Seed fakes, log a user in, force an error. Keep them
+/// cheap; [resetScenario] runs before every screen.
+final Map<String, Future<void> Function()> scenarios = {
+  // 'empty': () async => FakeRepo.instance.items = [],
+  // 'error': () async => FakeRepo.instance.failNext = true,
+  // 'logged-in': () async => FakeAuth.instance.user = demoUser,
+};
+
+Future<void> resetScenario() async {
+  // FakeRepo.instance.reset(); FakeAuth.instance.user = null;
+}
 ''';
 
 const captureTestTemplate = '''
@@ -30,7 +44,12 @@ import 'package:ui_map/ui_map.dart';
 
 import 'app_factory.dart' as app;
 
-void main() => UiMap.run(buildRouter: app.buildRouter, buildApp: app.buildApp);
+void main() => UiMap.run(
+      buildRouter: app.buildRouter,
+      buildApp: app.buildApp,
+      scenarios: app.scenarios,
+      resetScenario: app.resetScenario,
+    );
 ''';
 
 const configTemplate = '''
@@ -54,7 +73,9 @@ min_tap_size: 48             # dp; smaller tappable semantics nodes are reported
 routes:
   # "/items/:id": { params: { id: "1" } }
   # "/items":     { variants: ["?state=empty", "?state=loading", "?state=error"] }
+  # "/items":     { scenarios: [empty, error] }   # factory scenarios (see app_factory.dart)
   # "/debug":     { skip: true }
+# default_scenario: logged-in   # factory scenario applied to every screen
 
 exclude: []
 
@@ -101,6 +122,11 @@ Object? argumentsFor(String location) {
     _ => null,
   };
 }
+
+/// Optional: named fixtures (see ui_map.yaml `scenarios` / `default_scenario`).
+final Map<String, Future<void> Function()> scenarios = {};
+
+Future<void> resetScenario() async {}
 ''';
 
 const captureTestNavigatorTemplate = '''
@@ -110,5 +136,10 @@ import 'package:ui_map/ui_map.dart';
 
 import 'app_factory.dart' as app;
 
-void main() => UiMap.runNavigator(buildApp: app.buildApp, argumentsFor: app.argumentsFor);
+void main() => UiMap.runNavigator(
+      buildApp: app.buildApp,
+      argumentsFor: app.argumentsFor,
+      scenarios: app.scenarios,
+      resetScenario: app.resetScenario,
+    );
 ''';

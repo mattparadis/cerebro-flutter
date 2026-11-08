@@ -134,7 +134,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 6. Rendere riproducibili gli scenari tramite fixture
 
-- [ ] Affiancare alle varianti URL un modo per preparare dati e dipendenze di test.
+- [x] Affiancare alle varianti URL un modo per preparare dati e dipendenze di test. *(fatto 2026-11-08: `scenarios` + `resetScenario` nella factory, `routes.<path>.scenarios` e `default_scenario` nel yaml, id `__s-<nome>`, reset prima di ogni schermata e di ogni tap esplorato; demo: scenario `empty` pixel-identico alla variante URL)*
 
 **Problema:** `?state=empty|loading|error` può mostrare una schermata senza dimostrare la transizione reale fra stati. Molte app non espongono questi parametri.
 
@@ -216,7 +216,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 10. Rafforzare la definizione di regressione
 
-- [ ] Estendere `check` oltre gli aumenti nei conteggi di errori e target piccoli.
+- [x] Estendere `check` oltre gli aumenti nei conteggi di errori e target piccoli. *(fatto 2026-11-08: finding confrontati per identità (label/testo + dimensione o ratio), classi regression / coverage loss / improvement / visual / semantics, `--fail-on coverage`; test con difetto risolto + nuovo a conteggio invariato)*
 
 **Problema:** `ScreenChange.isRegression` non considera peggioramenti del contrasto. Un difetto può sparire e un altro comparire mantenendo invariato il conteggio, senza essere classificato come regressione.
 

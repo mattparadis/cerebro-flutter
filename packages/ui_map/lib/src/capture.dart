@@ -18,6 +18,13 @@ import 'routes.dart';
 
 export 'driver.dart' show AppBuilder, ArgumentsFor, RootBuilder, RouterBuilder;
 
+/// A named test fixture: seeds fakes, overrides dependencies, logs a user
+/// in, puts a repository in its error state. Runs (with real async
+/// allowed) right before the screen is built. Pair it with [ScenarioReset]
+/// so scenarios do not leak into the next screen.
+typedef ScenarioSetup = Future<void> Function();
+typedef ScenarioReset = Future<void> Function();
+
 /// Entry point called by the generated `test/ui_map/ui_map_capture_test.dart`.
 ///
 /// Registers one `testWidgets` per (location × device × theme × platform)
@@ -27,8 +34,17 @@ class UiMap {
   UiMap._();
 
   /// go_router apps.
-  static void run({required RouterBuilder buildRouter, required AppBuilder buildApp}) {
-    final env = _Env.read();
+  ///
+  /// [scenarios] are named fixtures the capture can apply per route
+  /// (`routes.<path>.scenarios` / `default_scenario` in ui_map.yaml);
+  /// [resetScenario] runs before every screen so state never leaks.
+  static void run({
+    required RouterBuilder buildRouter,
+    required AppBuilder buildApp,
+    Map<String, ScenarioSetup> scenarios = const {},
+    ScenarioReset? resetScenario,
+  }) {
+    final env = _Env.read(scenarios: scenarios, resetScenario: resetScenario);
     final tree = enumerateRoutes(buildRouter(initialLocation: '/'));
     final targets = expandTargets(tree, env.config);
     _writeRoutes(env, tree, targets, kind: 'go_router');
@@ -54,9 +70,11 @@ class UiMap {
   static void runNavigator({
     required RootBuilder buildApp,
     ArgumentsFor? argumentsFor,
+    Map<String, ScenarioSetup> scenarios = const {},
+    ScenarioReset? resetScenario,
     String? outDir,
   }) {
-    final env = _Env.read(outDirOverride: outDir);
+    final env = _Env.read(outDirOverride: outDir, scenarios: scenarios, resetScenario: resetScenario);
     final configArgs = {
       for (final e in env.config.routes.entries)
         if (e.value.args != null) e.key: e.value.args,
@@ -112,8 +130,24 @@ class UiMap {
   }
 
   static String _idFor(ScreenTarget t, _Combo c) {
-    final suffix = c.textScale == 1.0 ? '' : '__x${_fmtScale(c.textScale)}';
-    return '${slugForLocation(t.location)}__${c.device.name}__${c.theme}__${c.platform}$suffix';
+    final scale = c.textScale == 1.0 ? '' : '__x${_fmtScale(c.textScale)}';
+    final sc = t.scenario == null ? '' : '__s-${slugForScenario(t.scenario!)}';
+    return '${slugForLocation(t.location)}${sc}__${c.device.name}__${c.theme}__${c.platform}$scale';
+  }
+
+  /// Runs the reset hook, then the screen's scenario (or the default one).
+  /// Unknown scenario names are recorded on the result and skipped.
+  static Future<String?> _applyScenario(WidgetTester tester, _Env env, ScreenTarget target) async {
+    final name = target.scenario ?? env.config.defaultScenario;
+    final reset = env.resetScenario;
+    if (reset != null) await tester.runAsync(reset);
+    if (name == null) return null;
+    final setup = env.scenarios[name];
+    if (setup == null) {
+      return 'unknown scenario "$name": not in the factory\'s scenarios map';
+    }
+    await tester.runAsync(setup);
+    return null;
   }
 
   static void _writeRoutes(_Env env, List<RouteNode> tree, List<ScreenTarget> targets, {required String kind}) {
@@ -129,9 +163,11 @@ class UiMap {
             'route': t.routePath,
             if (t.routeName != null) 'name': t.routeName,
             'location': t.location,
+            if (t.scenario != null) 'scenario': t.scenario,
             if (t.skipped) 'skipped': t.skippedReason,
           },
       ],
+      'scenarios': env.scenarios.keys.toList(),
     });
   }
 
@@ -168,6 +204,8 @@ class UiMap {
       'theme': theme,
       'platform': platform,
       'text_scale': textScale,
+      if (target.scenario != null || config.defaultScenario != null)
+        'scenario': target.scenario ?? config.defaultScenario,
       'status': 'ok',
     };
     final screensDir = Directory(p.join(outDir, 'screens'))..createSync(recursive: true);
@@ -208,6 +246,8 @@ class UiMap {
             key: key,
             child: _withInsetBands(app, top: device.safeTop, bottom: device.safeBottom),
           );
+      final scenarioProblem = await _applyScenario(tester, env, target);
+      if (scenarioProblem != null) result['scenario_issue'] = scenarioProblem;
       await driver.open(tester, target.location, themeMode, wrap);
       await _settle(tester, config);
       final landed = driver.snapshot(tester).location;
@@ -281,6 +321,7 @@ class UiMap {
             config: config,
             driver: driver,
             wrap: (app) => _withInsetBands(app, top: device.safeTop, bottom: device.safeBottom),
+            env: env,
           ))
               .map((e) => e.toJson())
               .toList();
@@ -330,6 +371,7 @@ class UiMap {
     required UiMapConfig config,
     required ScreenDriver driver,
     required AppWrap wrap,
+    required _Env env,
   }) async {
     final edges = <NavEdge>[];
     final candidates = tappables
@@ -339,6 +381,7 @@ class UiMap {
     var unlabeled = 0;
     for (final t in candidates) {
       final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
+      await _applyScenario(tester, env, target);
       await driver.open(tester, target.location, themeMode, wrap);
       await _settle(tester, config);
       while (tester.takeException() != null) {}
@@ -498,6 +541,8 @@ class _Env {
     required this.outDir,
     required this.mode,
     required this.explore,
+    this.scenarios = const {},
+    this.resetScenario,
   });
 
   final String projectRoot;
@@ -506,8 +551,14 @@ class _Env {
   final String outDir;
   final String mode;
   final bool explore;
+  final Map<String, ScenarioSetup> scenarios;
+  final ScenarioReset? resetScenario;
 
-  static _Env read({String? outDirOverride}) {
+  static _Env read({
+    String? outDirOverride,
+    Map<String, ScenarioSetup> scenarios = const {},
+    ScenarioReset? resetScenario,
+  }) {
     TestWidgetsFlutterBinding.ensureInitialized();
     const outEnv = String.fromEnvironment('UI_MAP_OUT');
     const cfgEnv = String.fromEnvironment('UI_MAP_CONFIG');
@@ -525,6 +576,8 @@ class _Env {
       outDir: outDir,
       mode: mode,
       explore: exploreEnv == 'true' || (exploreEnv.isEmpty && config.explore),
+      scenarios: scenarios,
+      resetScenario: resetScenario,
     );
   }
 }

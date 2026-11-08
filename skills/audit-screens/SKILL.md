@@ -30,7 +30,14 @@ package from this repository (`packages/ui_map`).
 4. Run `dart run ui_map routes`. For every `SKIP ... missing params` line, add
    sample values under `routes:` in `ui_map.yaml`. For list screens, add
    `variants` for empty / loading / error states if the app exposes them via
-   query parameters (see "Scenario hook" below). Then rerun `routes`.
+   query parameters. If it does not (most apps), add **scenarios** to the
+   factory instead: find the app's test seam (a repository you can swap, a
+   static override, a DI container, a stored token for "logged in") and
+   write `scenarios: {'empty': () async {...}, 'error': ..., 'logged-in':
+   ...}` plus `resetScenario`; then list them per route
+   (`routes."/orders".scenarios: [empty, error]`) or as `default_scenario`.
+   A capture taken logged out where every screen redirects to login is not
+   an audit of the app. Then rerun `routes`.
 
 ## 1. Capture (or reuse) the screens
 
@@ -160,17 +167,19 @@ Finish with a short message: screens audited, counts of confirmed and
 suspected findings, top three findings with severity and status, path to
 `SUMMARY.md`, and the capture limits.
 
-## Scenario hook (for the developer)
+## Scenario hooks (for the developer)
 
-A screen state is addressed as a location. The recommended pattern is a
-query parameter read by the screen, e.g. `/notes?state=empty`, declared in
-`ui_map.yaml`:
+Two ways to reach a screen state, both declared in `ui_map.yaml`:
 
 ```yaml
 routes:
-  "/notes": { variants: ["?state=empty", "?state=loading", "?state=error"] }
+  "/notes":     { variants: ["?state=empty", "?state=error"] }   # URL hook read by the screen
+  "/orders":    { scenarios: [empty, error] }                     # factory fixtures, no URL support needed
   "/notes/:id": { params: { id: "1" } }
+default_scenario: logged-in                                        # applied to every screen
 ```
 
-If the app has no such hook, audit the default state and list the missing
-states under "could not check".
+Scenarios live in `test/ui_map/app_factory.dart` as named async setups
+plus a `resetScenario`; they can seed fakes, store a token, force a
+repository error. States that neither mechanism can reach go under
+"Not checked / capture limits", never silently.

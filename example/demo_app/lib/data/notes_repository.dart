@@ -33,6 +33,11 @@ ListState parseState(String? raw) => switch (raw) {
 class NotesRepository {
   const NotesRepository();
 
+  /// Test seam: when set, every list() ignores the requested state and uses
+  /// this one. ui_map scenarios in test/ui_map/app_factory.dart set it to
+  /// capture screens whose URL has no `?state=` hook.
+  static ListState? scenarioOverride;
+
   static const _notes = <Note>[
     Note(
       id: '1',
@@ -72,7 +77,8 @@ class NotesRepository {
     ),
   ];
 
-  Future<List<Note>> list(ListState state) {
+  Future<List<Note>> list(ListState requested) {
+    final state = scenarioOverride ?? requested;
     switch (state) {
       case ListState.loading:
         return Completer<List<Note>>().future; // never completes

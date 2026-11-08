@@ -41,10 +41,10 @@ Future<void> main(List<String> argv) async {
         help: 'Also tap every target of each screen and record the navigation edges (slower).')
     ..addOption('baseline', help: 'Baseline map.json or directory (default: <out>/baseline).')
     ..addOption('fail-on',
-        allowed: ['none', 'regression', 'any'],
+        allowed: ['none', 'regression', 'coverage', 'any'],
         defaultsTo: 'regression',
-        help: 'diff/check exit code 1 on: regressions (errors, new layout exceptions, new small '
-            'targets), any change, or never.')
+        help: 'diff/check exit code 1 on: regression (a finding not in the baseline, by identity, or a '
+            'screen that stopped rendering), coverage (regression or coverage loss), any change, or never.')
     ..addOption('lint-fail-on',
         allowed: ['none', 'error', 'warning', 'convention', 'info'],
         defaultsTo: 'error',
@@ -257,16 +257,19 @@ int _diff(String root, String outDir, String? baselineArg, String failOn) {
       .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(diff.toJson()));
   File(p.join(outDir, 'DIFF.md')).writeAsStringSync(diff.renderMarkdown());
   final regressions = diff.changed.where((c) => c.isRegression).length;
-  stdout.writeln('ui_map diff: ${diff.changed.length} changed ($regressions regressions), '
+  final losses = diff.changed.where((c) => c.hasCoverageLoss).length;
+  stdout.writeln('ui_map diff: ${diff.changed.length} changed ($regressions regressions, $losses coverage loss), '
       '${diff.added.length} added, ${diff.removed.length} removed, ${diff.unchanged} unchanged.');
   for (final c in diff.changed.take(10)) {
-    stdout.writeln('  ${c.isRegression ? '!!' : '  '} ${c.location} · ${c.theme}'
+    final mark = c.isRegression ? '!!' : c.hasCoverageLoss ? ' ?' : '  ';
+    stdout.writeln('  $mark ${c.location} · ${c.theme}'
         '${c.textScale == 1.0 ? '' : ' · x${c.textScale}'}: ${c.describe()}');
   }
   if (diff.changed.length > 10) stdout.writeln('  ... see ${p.relative(p.join(outDir, 'DIFF.md'), from: root)}');
   stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'DIFF.md'), from: root)} written.');
   return switch (failOn) {
     'any' => diff.hasChanges ? 1 : 0,
+    'coverage' => regressions > 0 || losses > 0 ? 1 : 0,
     'regression' => regressions > 0 ? 1 : 0,
     _ => 0,
   };

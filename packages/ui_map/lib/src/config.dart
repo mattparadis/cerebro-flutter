@@ -40,6 +40,7 @@ class RouteOptions {
     this.variants = const [],
     this.skip = false,
     this.args,
+    this.scenarios = const [],
   });
 
   /// Values substituted for `:param` segments.
@@ -48,6 +49,11 @@ class RouteOptions {
   /// Navigator 1.0 only: `Navigator.pushNamed(..., arguments:)` payload
   /// (a YAML map/list/scalar) used when the factory gives none.
   final Object? args;
+
+  /// Names of factory scenarios to capture this route under, in addition
+  /// to the default (no scenario). Each one becomes a screen with an
+  /// `__s-<name>` id suffix.
+  final List<String> scenarios;
 
   /// Query strings (e.g. `?state=empty`) appended as extra locations.
   /// The plain location is always captured too.
@@ -74,6 +80,7 @@ class UiMapConfig {
     this.lintRules = const {},
     this.explore = false,
     this.exploreMaxTaps = 40,
+    this.defaultScenario,
   });
 
   final List<DeviceSpec> devices;
@@ -107,6 +114,10 @@ class UiMapConfig {
   /// Tap every semantics target of each screen and record where it leads.
   final bool explore;
   final int exploreMaxTaps;
+
+  /// Factory scenario applied to every screen that names none (e.g.
+  /// `logged-in`). Screens still get no `__s-` suffix for it.
+  final String? defaultScenario;
 
   static UiMapConfig load(String path) {
     final file = File(path);
@@ -148,6 +159,7 @@ class UiMapConfig {
           variants: [for (final s in (v['variants'] as List?) ?? []) '$s'],
           skip: v['skip'] == true,
           args: v['args'],
+          scenarios: [for (final n in (v['scenarios'] as List?) ?? []) '$n'],
         );
       }
     }
@@ -172,6 +184,7 @@ class UiMapConfig {
       fonts: fonts,
       outDir: '${m['out_dir'] ?? d.outDir}',
       explore: m['explore'] == true,
+      defaultScenario: m['default_scenario'] == null ? null : '${m['default_scenario']}',
       exploreMaxTaps: (m['explore_max_taps'] as num?)?.toInt() ?? d.exploreMaxTaps,
       lintExclude: _strings((m['lint'] as Map?)?['exclude']),
       lintRules: {
@@ -196,6 +209,7 @@ class UiMapConfig {
               'variants': e.value.variants,
               'skip': e.value.skip,
               if (e.value.args != null) 'args': e.value.args,
+              if (e.value.scenarios.isNotEmpty) 'scenarios': e.value.scenarios,
             },
         },
         'exclude': exclude,
@@ -204,6 +218,7 @@ class UiMapConfig {
         'lint': {'exclude': lintExclude, 'rules': lintRules},
         'explore': explore,
         'explore_max_taps': exploreMaxTaps,
+        if (defaultScenario != null) 'default_scenario': defaultScenario,
       };
 
   static List<String>? _strings(Object? v) =>

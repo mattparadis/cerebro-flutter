@@ -182,7 +182,8 @@ class MapWriter {
     b.writeln();
     final byLocation = <String, List<Map>>{};
     for (final s in screens) {
-      byLocation.putIfAbsent('${s['location']}', () => []).add(s);
+      final key = s['scenario'] == null ? '${s['location']}' : '${s['location']} [${s['scenario']}]';
+      byLocation.putIfAbsent(key, () => []).add(s);
     }
     for (final entry in byLocation.entries) {
       final first = entry.value.first;
@@ -206,7 +207,9 @@ class MapWriter {
         if (s['error'] != null) notes.add('${s['error']}');
         final png = s['png'];
         final img = png == null ? '' : '<img src="$png" width="120" alt="${s['id']}">';
-        b.writeln('| ${s['device']} · ${s['theme']} · ${s['platform']} | $img | ${s['status']} | ${notes.join('; ')} |');
+        final sc = s['scenario'] == null ? '' : ' · scenario `${s['scenario']}`';
+        if (s['scenario_issue'] != null) notes.add('${s['scenario_issue']}');
+        b.writeln('| ${s['device']} · ${s['theme']} · ${s['platform']}$sc | $img | ${s['status']} | ${notes.join('; ')} |');
       }
       b.writeln();
     }

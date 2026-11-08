@@ -136,9 +136,12 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
    small state switch inside the screen; never leave a state unhandled.
 2. Wire the route in the router with the semantics decided in the brief
    (`pageBuilder` with `fullscreenDialog: true` for modal creation flows,
-   `context.push` for details, `context.go` for replacing flows). Expose
-   states by query parameter when the data layer allows it
-   (`?state=empty|loading|error`), so they can be captured.
+   `context.push` for details, `context.go` for replacing flows). Make
+   every state capturable: add factory scenarios in
+   `test/ui_map/app_factory.dart` that put the data layer in each state
+   (empty, loading, error, logged-in) and list them under
+   `routes.<path>.scenarios` in `ui_map.yaml`; or, when the screen already
+   reads a query parameter, URL variants (`?state=empty`).
 3. Add the route (and its `params` / `variants`) to `ui_map.yaml`, run
    `dart run ui_map capture --explore`, and look at every PNG of the new
    screen in light and dark (and `__x1.3` if `text_scales` includes 1.3).

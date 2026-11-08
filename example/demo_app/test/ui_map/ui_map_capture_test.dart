@@ -4,4 +4,9 @@ import 'package:ui_map/ui_map.dart';
 
 import 'app_factory.dart' as app;
 
-void main() => UiMap.run(buildRouter: app.buildRouter, buildApp: app.buildApp);
+void main() => UiMap.run(
+      buildRouter: app.buildRouter,
+      buildApp: app.buildApp,
+      scenarios: app.scenarios,
+      resetScenario: app.resetScenario,
+    );

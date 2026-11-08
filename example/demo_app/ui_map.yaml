@@ -10,7 +10,10 @@ min_tap_size: 48
 
 routes:
   "/notes/:id": { params: { id: "1" } }
-  "/notes":     { variants: ["?state=empty", "?state=loading", "?state=error"] }
+  # URL variants for the states the screen exposes, plus a factory scenario
+  # (test/ui_map/app_factory.dart) that reaches the same empty state without
+  # any URL hook: the two captures must be pixel-identical.
+  "/notes":     { variants: ["?state=empty", "?state=loading", "?state=error"], scenarios: [empty] }
   "/__proto/note-detail": { variants: ["?v=b"] }   # only present with -D UI_PROTO=true
 
 exclude: []

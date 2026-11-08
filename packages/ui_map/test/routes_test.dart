@@ -87,6 +87,18 @@ void main() {
       expect(byRoute['/shelled|/shelled']!.skippedReason, contains('excluded'));
       expect(byRoute['/b/sub|/b/sub']!.skipped, isFalse);
     });
+
+    test('scenarios add one target per name on the plain location', () {
+      final tree = enumerateRoutes(_fixtureRouter());
+      final config = UiMapConfig.fromMap({
+        'routes': {
+          '/b': {'variants': ['?x=1'], 'scenarios': ['empty', 'logged in']},
+        },
+      });
+      final b = expandTargets(tree, config).where((t) => t.routePath == '/b').toList();
+      expect(b.map((t) => '${t.location}|${t.scenario}'), ['/b|null', '/b?x=1|null', '/b|empty', '/b|logged in']);
+      expect(slugForScenario('logged in'), 'logged-in');
+    });
   });
 
   group('slugForLocation', () {

@@ -125,11 +125,15 @@ class ScreenTarget {
     required this.routeName,
     required this.location,
     this.skippedReason,
+    this.scenario,
   });
 
   final String routePath;
   final String? routeName;
   final String location;
+
+  /// Factory scenario to set up before opening the screen; null = default.
+  final String? scenario;
 
   /// Non-null when the route cannot be rendered (missing params, excluded).
   final String? skippedReason;
@@ -174,9 +178,15 @@ List<ScreenTarget> expandTargets(List<RouteNode> tree, UiMapConfig config) {
       final suffix = v.startsWith('?') ? v : '?$v';
       targets.add(ScreenTarget(routePath: path, routeName: r.name, location: '$location$suffix'));
     }
+    for (final sc in opts.scenarios) {
+      targets.add(ScreenTarget(routePath: path, routeName: r.name, location: location, scenario: sc));
+    }
   }
   return targets;
 }
+
+/// Id-safe form of a scenario name.
+String slugForScenario(String name) => name.replaceAll(RegExp(r'[^A-Za-z0-9_\-.]'), '-');
 
 /// File-system safe id for a location: `/notes?state=empty` -> `notes__state-empty`,
 /// `/` -> `root`, `/notes/1` -> `notes_1`.

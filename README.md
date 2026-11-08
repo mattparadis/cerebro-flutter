@@ -84,7 +84,15 @@ this takes about 20 s for 62 taps.
 Large-text variants (`text_scales: [1.0, 1.3]`) and prototype routes
 (`dart run ui_map capture -D UI_PROTO=true`) are captured the same way.
 
-Screen **states** are addressed as locations: a list screen that reads
+Screen **states** come from two mechanisms. **Scenarios** are named
+fixtures in `test/ui_map/app_factory.dart` (`scenarios: {'empty': () async
+=> FakeRepo.items = [], 'logged-in': ...}` plus a `resetScenario` that runs
+before every screen); `ui_map.yaml` applies them per route
+(`routes."/orders".scenarios: [empty, error]`) or to every screen
+(`default_scenario: logged-in`). Each becomes a screen with an `__s-<name>`
+id. They work with any architecture that has a test seam (a static
+override, a DI container, an in-memory repository) and need no URL support.
+Alternatively, **URL variants** are addressed as locations: a list screen that reads
 `?state=empty|loading|error` from `GoRouterState.uri.queryParameters` can
 be captured in every state by listing `variants` in `ui_map.yaml`. No
 test-only wiring needed.
@@ -274,11 +282,15 @@ dart run ui_map check        # capture + diff; exit 1 on regressions
 ```
 
 `check` writes `.ui-map/diff.json` and `.ui-map/DIFF.md` (before/after
-thumbnails) and classifies each change as visual only, semantics only
-(labels, actions), or a **regression**: a screen that stopped rendering, a
-new layout exception, or a new tap target below the minimum. Hashes are
-deterministic, so an unchanged screen never shows up. Use `--fail-on any`
-to block on every pixel change, `--fail-on none` to only report.
+thumbnails) and classifies each change as **regression** (a finding that was
+not in the baseline, compared by identity: label or text plus size or
+contrast ratio, so a fixed defect next to a new one still surfaces the new
+one; or a screen that stopped rendering), **coverage loss** (fewer texts
+measurable than before), **improvement** (findings fixed), or plain visual /
+semantics change. Hashes are deterministic, so an unchanged screen never
+shows up. `--fail-on regression` (default) blocks on regressions,
+`--fail-on coverage` also on coverage loss, `--fail-on any` on every pixel
+change, `--fail-on none` only reports.
 
 Pre-commit hook (`.git/hooks/pre-commit` or your hook manager):
 
