@@ -12,6 +12,8 @@ void main() {
     expect(c.settleMs, 600);
     expect(c.exportScale, 2);
     expect(c.minTapSize, 48);
+    expect(c.minTapSizeFor('ios'), 44);
+    expect(c.minTapSizeFor('windows'), 48);
     expect(c.outDir, '.ui-map');
     expect(c.lintExclude, isNull);
   });
@@ -28,7 +30,9 @@ platforms: [android, ios]
 text_scales: [1.0, 1.3]
 settle_ms: 1000
 export_scale: 1
-min_tap_size: 44
+min_tap_size: { android: 48, ios: 44 }
+keyboard_inset: 260
+locales: [en, it]
 routes:
   "/items/:id": { params: { id: 42 } }
   "/items": { variants: ["?state=empty"] }
@@ -52,7 +56,11 @@ lint:
     expect(c.textScales, [1.0, 1.3]);
     expect(c.settleMs, 1000);
     expect(c.exportScale, 1);
-    expect(c.minTapSize, 44);
+    expect(c.minTapSize, 48);
+    expect(c.minTapSizeFor('ios'), 44);
+    expect(c.minTapSizeFor('android'), 48);
+    expect(c.keyboardInset, 260);
+    expect(c.locales, ['en', 'it']);
     expect(c.routes['/items/:id']!.params, {'id': '42'});
     expect(c.routes['/items']!.variants, ['?state=empty']);
     expect(c.routes['/debug']!.skip, isTrue);

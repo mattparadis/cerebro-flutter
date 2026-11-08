@@ -36,8 +36,12 @@ NOTICE.
 11. Line length under about 60 characters for body copy on phone.
 12. Text not truncated where meaning is lost (ellipsis on titles, cut-off
     buttons). `maxLines` with ellipsis on body previews is fine.
-13. Large text (`textScaleFactor` 1.3+) would still fit: judge from fixed-
-    height containers and single-line `Row`s with text (risk of overflow).
+13. Large text: when `text_scales` includes 1.3 or 2.0, judge the `__x1.3`
+    / `__x2` captures (overflow, clipping, truncation); otherwise mark
+    `not_checked` and point at fixed-height containers and single-line
+    `Row`s with text as the likely break points. Keyboard-open captures
+    (`__kb`) show whether the focused field and the submit action stay
+    reachable.
 
 ## C. Colour and contrast
 
@@ -62,8 +66,11 @@ NOTICE.
 
 ## D. Touch targets and accessibility
 
-19. Every tappable at least 48×48 dp (Material) / 44×44 pt (iOS). Use
-    `tappables_below_min`; ignore `tappables_below_min_nested`.
+19. Every tappable at least 48×48 dp (Material) / 44×44 pt (iOS); the
+    tool applies the threshold of the captured platform
+    (`min_tap_size` in map.json per screen). Use `tappables_below_min`;
+    for `tappables_below_min_nested` check that the enclosing target
+    performs the same action before dismissing it.
 20. Spacing between adjacent targets at least 8 dp.
 21. Icon-only buttons have a `tooltip` or `Semantics(label)`: in the
     semantics dump every node with `tap` should have a label or tooltip.

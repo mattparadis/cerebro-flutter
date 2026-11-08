@@ -40,13 +40,17 @@ Checklist Design (MIT); see NOTICE.
 
 | Transition | Use when | go_router / Flutter |
 |---|---|---|
-| **Push** | drilling into content; back returns to the list in the same state | `context.push('/notes/1')`; child route of the list |
-| **Replace / go** | finishing a flow (auth → home, onboarding → login); back must not return | `context.go('/notes')` after the flow; top-level routes |
+| **Push** | drilling into content; back returns to the list in the same state | `context.push('/notes/1')`, or `context.go` to a **child** route: go_router builds the parent stack from the route tree, so back still returns to the list |
+| **Replace / go** | finishing a flow (auth → home, onboarding → login); back must not return | `context.go('/notes')` to a **top-level** route; the previous stack is discarded |
 | **Modal page** | creating or editing; self-contained task with Cancel/Save | `pageBuilder` + `MaterialPage(fullscreenDialog: true)`; close × left |
 | **Sheet** | quick choice, filter, share, short form (< 1 screen) | `showModalBottomSheet` (drag handle, `useSafeArea`) / `showCupertinoSheet` |
 | **Dialog** | a decision that blocks (destructive confirm, permission rationale) | `showAdaptiveDialog`, two actions max |
 | **Tabs** | top-level sections of equal rank; state preserved per tab | `StatefulShellRoute.indexedStack`; 3-5 branches; current tab tap pops to root |
 | **No back** | forced flows (paywall after onboarding, mandatory update) | `PopScope(canPop: false)` **only** with an explicit alternative on screen ("Not now", "Skip") |
+
+Judge navigation by observed behaviour (the explored `pop` edge after a
+`go`/`push`), not by the API name: `go` to a child route and `push` both
+leave a working back; `go` to a top-level route does not.
 
 Rules: one modal at a time; no push from a sheet (dismiss, then push);
 deep links open the screen with its parent stack (`/notes/1` can pop to
@@ -55,15 +59,24 @@ AppBar back do the same thing.
 
 ## Forms
 
-- One column, labels above or floating (`labelText`), never placeholder
-  only; helper text for format; `keyboardType`, `textInputAction`
-  (`next` / `done`), `autofillHints`, `obscureText` with a show toggle.
-- Validate on submit and on blur after first error, not on every
-  keystroke; error text under the field, field outlined in `error`;
-  focus the first invalid field.
-- Primary action pinned at the bottom (above the keyboard with
-  `resizeToAvoidBottomInset`) or in the AppBar for modal creation;
-  disabled until valid.
+Legend: **R** requirement, **D** default, **C** context-dependent.
+
+- **R** Labels visible (`labelText` or a label above), never placeholder
+  only; errors in text next to the field, not colour alone. **D** helper
+  text for format; `keyboardType`, `textInputAction` (`next` / `done`),
+  `autofillHints`, `obscureText` with a show toggle.
+- **D** Validation policy, choose one per app and state it in the brief:
+  (a) *submit always enabled*: validate on submit, show every error inline,
+  focus the first invalid field, keep the button enabled so the user
+  learns what is missing; this is the default. (b) *disabled until valid*:
+  only when the requirements are visible up front (a checklist, a counter,
+  inline hints) so the user can tell how to enable it; a disabled button
+  with no explanation is a defect. In both: disable (with a spinner) while
+  a submission is in flight, and prevent a double submit.
+- **D** Validate on submit and on blur after the first error, not on every
+  keystroke; field outlined in `error`.
+- **D** Primary action pinned at the bottom (above the keyboard with
+  `resizeToAvoidBottomInset`) or in the AppBar for modal creation.
 - Multi-step forms show progress ("Step 2 of 3") and keep entered data on
   back.
 

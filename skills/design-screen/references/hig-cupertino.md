@@ -11,13 +11,24 @@ and the Flutter `cupertino` library. iOS 17-26 conventions.
 | **Cupertino on iOS, Material on Android** | consumer apps where iOS users expect native chrome | `Theme.of(context).platform` switch at the scaffold level; shared content widgets inside; two shells, one body |
 | **Cupertino only** | iOS-only products | `CupertinoApp`, Cupertino widgets throughout |
 
-Never mix on one screen (a Material AppBar with a Cupertino switch, a
-Cupertino nav bar with a Material FAB). Adaptive means the *shell*
-changes, the content stays.
+What to avoid is two **navigation chromes** or two visual languages for
+the same component class on one screen (a Cupertino nav bar with a
+Material FAB, a Material AppBar with a bare `CupertinoSwitch` next to a
+Material `Switch`). A Material shell that uses the `.adaptive`
+constructors (`Switch.adaptive`, `AlertDialog.adaptive`,
+`CircularProgressIndicator.adaptive`) and Cupertino transitions on iOS is
+one coherent strategy, not mixing. Adaptive means the *shell* and the
+platform-owned controls change together, the content stays.
 
 ## HIG rules that most often break in Flutter apps
 
-- **Touch targets** 44 × 44 pt minimum; spacing between targets 8 pt.
+Legend: **R** requirement (verifiable, platform rule or WCAG), **D**
+default (follow unless the brief says why not), **C** context-dependent.
+
+- **R Touch targets** 44 × 44 pt minimum on iOS (48 dp on Android;
+  `min_tap_size: {android: 48, ios: 44}` in `ui_map.yaml` makes the tool
+  apply the right one per captured platform); **D** spacing between
+  targets 8 pt.
 - **Safe areas**: respect top (status bar / Dynamic Island) and bottom
   (home indicator) insets; `SafeArea` or `CupertinoPageScaffold`. Never
   put a tappable control under the home indicator.

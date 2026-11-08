@@ -99,6 +99,13 @@ void main() {
       expect(b.map((t) => '${t.location}|${t.scenario}'), ['/b|null', '/b?x=1|null', '/b|empty', '/b|logged in']);
       expect(slugForScenario('logged in'), 'logged-in');
     });
+
+    test('keyboard: true adds a keyboard target', () {
+      final tree = enumerateRoutes(_fixtureRouter());
+      final config = UiMapConfig.fromMap({'routes': {'/': {'keyboard': true}}});
+      final root = expandTargets(tree, config).where((t) => t.routePath == '/').toList();
+      expect(root.map((t) => t.keyboard), [false, true]);
+    });
   });
 
   group('slugForLocation', () {

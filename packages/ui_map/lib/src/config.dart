@@ -41,6 +41,7 @@ class RouteOptions {
     this.skip = false,
     this.args,
     this.scenarios = const [],
+    this.keyboard = false,
   });
 
   /// Values substituted for `:param` segments.
@@ -54,6 +55,10 @@ class RouteOptions {
   /// to the default (no scenario). Each one becomes a screen with an
   /// `__s-<name>` id suffix.
   final List<String> scenarios;
+
+  /// Also capture this route with the soft keyboard open (first text field
+  /// focused, bottom view inset = `keyboard_inset`), id suffix `__kb`.
+  final bool keyboard;
 
   /// Query strings (e.g. `?state=empty`) appended as extra locations.
   /// The plain location is always captured too.
@@ -72,6 +77,9 @@ class UiMapConfig {
     this.realAsyncMs = 0,
     this.exportScale = 2,
     this.minTapSize = 48,
+    this.minTapSizeByPlatform = const {'ios': 44, 'macos': 44},
+    this.keyboardInset = 300,
+    this.locales = const [],
     this.routes = const {},
     this.exclude = const [],
     this.fonts = const {},
@@ -99,7 +107,23 @@ class UiMapConfig {
   /// spinning forever in the fake-async zone.
   final int realAsyncMs;
   final double exportScale;
+
+  /// Default minimum tap target (dp). Material: 48.
   final double minTapSize;
+
+  /// Per-platform overrides; Apple HIG: 44 pt. `min_tap_size` in the yaml
+  /// accepts a number or a map `{android: 48, ios: 44}`.
+  final Map<String, double> minTapSizeByPlatform;
+
+  /// Simulated keyboard height (dp) for routes with `keyboard: true`.
+  final double keyboardInset;
+
+  /// Locales to capture (BCP 47, e.g. `[en, it, ar]`); the first is the
+  /// default and gets no id suffix. Applied through the platform locale, so
+  /// apps that force `MaterialApp.locale` ignore it.
+  final List<String> locales;
+
+  double minTapSizeFor(String platform) => minTapSizeByPlatform[platform] ?? minTapSize;
   final Map<String, RouteOptions> routes;
   final List<String> exclude;
 
@@ -160,6 +184,7 @@ class UiMapConfig {
           skip: v['skip'] == true,
           args: v['args'],
           scenarios: [for (final n in (v['scenarios'] as List?) ?? []) '$n'],
+          keyboard: v['keyboard'] == true,
         );
       }
     }
@@ -178,7 +203,12 @@ class UiMapConfig {
       settleMs: (m['settle_ms'] as num?)?.toInt() ?? d.settleMs,
       realAsyncMs: (m['real_async_ms'] as num?)?.toInt() ?? d.realAsyncMs,
       exportScale: (m['export_scale'] as num?)?.toDouble() ?? d.exportScale,
-      minTapSize: (m['min_tap_size'] as num?)?.toDouble() ?? d.minTapSize,
+      minTapSize: m['min_tap_size'] is num ? (m['min_tap_size'] as num).toDouble() : d.minTapSize,
+      minTapSizeByPlatform: m['min_tap_size'] is Map
+          ? {for (final e in (m['min_tap_size'] as Map).entries) '${e.key}': (e.value as num).toDouble()}
+          : d.minTapSizeByPlatform,
+      keyboardInset: (m['keyboard_inset'] as num?)?.toDouble() ?? d.keyboardInset,
+      locales: _strings(m['locales']) ?? d.locales,
       routes: routes,
       exclude: _strings(m['exclude']) ?? const [],
       fonts: fonts,
@@ -202,6 +232,9 @@ class UiMapConfig {
         'real_async_ms': realAsyncMs,
         'export_scale': exportScale,
         'min_tap_size': minTapSize,
+        'min_tap_size_by_platform': minTapSizeByPlatform,
+        'keyboard_inset': keyboardInset,
+        'locales': locales,
         'routes': {
           for (final e in routes.entries)
             e.key: {
@@ -210,6 +243,7 @@ class UiMapConfig {
               'skip': e.value.skip,
               if (e.value.args != null) 'args': e.value.args,
               if (e.value.scenarios.isNotEmpty) 'scenarios': e.value.scenarios,
+              if (e.value.keyboard) 'keyboard': true,
             },
         },
         'exclude': exclude,

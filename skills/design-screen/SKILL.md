@@ -42,6 +42,10 @@ message:
    action leads to.
 5. **States**: default, empty, loading, error, plus any domain states.
    Each one must be designed, not just handled.
+6. **Coverage**: which devices, themes, platforms, text scales, locales
+   and keyboard-open screens the capture will run (`ui_map.yaml`); for a
+   form, set `keyboard: true` on its route. What is not run is reported
+   as not verified, never assumed.
 
 ## 2. Inherit the app's conventions
 
@@ -64,8 +68,16 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
 
 ## 3. Design decisions (write them down, briefly)
 
-- **Hierarchy**: one primary action (`FilledButton` or FAB), secondary as
-  `TextButton`/`OutlinedButton`, nothing else competes.
+Three kinds of rule, kept apart: **requirements** (platform rules and
+WCAG: touch targets, contrast, a way back, labels) are not negotiable;
+**defaults** (one primary action, 16 dp gutter, three type sizes, M3
+components) hold unless the brief gives a reason; **context choices**
+(validation policy, push vs go, density, how much the screen may depart
+from the app's conventions) are decided per screen and written down. A
+default broken on purpose is a decision; a requirement broken is a defect.
+
+- **Hierarchy** (default): one primary action (`FilledButton` or FAB),
+  secondary as `TextButton`/`OutlinedButton`, nothing else competes.
 - **Layout**: 4/8 dp grid, 16 dp gutter (24 on standalone marketing/auth
   screens if the app does that), sections grouped by whitespace before
   dividers or cards.
@@ -74,7 +86,8 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
 - **Colour**: `ColorScheme` roles only. Surfaces use the
   `surfaceContainer*` tiers; text uses `onSurface` / `onSurfaceVariant`;
   the accent is `primary`. No `Color(0x...)`, no `Colors.*` literals.
-- **Touch**: every target 48 dp (44 pt iOS), 8 dp between targets.
+- **Touch** (requirement): every target 48 dp on Android, 44 pt on iOS;
+  8 dp between targets (default).
 - **Semantics**: title is a header (`Semantics(header: true)` or AppBar),
   icon-only buttons have tooltips, images carry labels or are excluded,
   reading order follows visual order.

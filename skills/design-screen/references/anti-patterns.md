@@ -6,10 +6,16 @@ breaks on real devices. Ideas adapted from impeccable / klamben
 
 ## Looks generated
 
-- Purple-to-blue (or any) gradient backgrounds and gradient buttons.
+Signals, not verdicts: each of these is wrong when it appears without a
+reason tied to the content or the brand. A gradient that is the brand, a
+centred composition on a hero or an empty state, two accents in a chart
+are fine; the same choices as reflexes are what make screens look alike.
+When a signal is kept on purpose, say why in the brief.
+
+- Gradient backgrounds and gradient buttons used as decoration.
 - Everything centred: centred body text, centred titles on list screens,
-  centred cards with equal padding. Left-align content; centre only
-  onboarding/empty states.
+  centred cards with equal padding. Left-align reading content; centre
+  onboarding, empty states and single-focus heroes.
 - Cards inside cards, borders plus shadows, `Container(decoration:
   BoxDecoration(...))` where `Card`, `ListTile` or a `surfaceContainer*`
   tier would do.

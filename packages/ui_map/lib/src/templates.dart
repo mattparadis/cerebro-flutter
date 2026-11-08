@@ -66,7 +66,9 @@ text_scales: [1.0]           # add 1.3 to also capture large-text variants (ids 
 settle_ms: 600               # fixed pumps after build; never pumpAndSettle
 real_async_ms: 0             # >0: also wait real time so HTTP (answered 400 in tests) / file I/O settles
 export_scale: 2
-min_tap_size: 48             # dp; smaller tappable semantics nodes are reported
+min_tap_size: { android: 48, ios: 44 }   # dp per platform (or one number)
+keyboard_inset: 300          # dp; used by routes with `keyboard: true`
+locales: []                  # e.g. [en, it, ar]; first = default, others get an id suffix
 
 # Per-route options. Keys are the full route paths printed by
 # `dart run ui_map routes`.
@@ -74,6 +76,7 @@ routes:
   # "/items/:id": { params: { id: "1" } }
   # "/items":     { variants: ["?state=empty", "?state=loading", "?state=error"] }
   # "/items":     { scenarios: [empty, error] }   # factory scenarios (see app_factory.dart)
+  # "/login":     { keyboard: true }               # extra capture with the keyboard open (__kb)
   # "/debug":     { skip: true }
 # default_scenario: logged-in   # factory scenario applied to every screen
 

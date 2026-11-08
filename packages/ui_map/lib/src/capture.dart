@@ -54,9 +54,10 @@ class UiMap {
     }
     _registerFonts(env);
     final driver = GoRouterDriver(buildRouter: buildRouter, buildApp: buildApp);
+    final firstLocale = env.config.locales.isEmpty ? null : env.config.locales.first;
     for (final combo in _combos(env)) {
       for (final t in targets.where((t) => !t.skipped)) {
-        final id = _idFor(t, combo);
+        final id = _idFor(t, combo, firstLocale: combo.locale == firstLocale);
         testWidgets('ui_map $id', (tester) async {
           await _captureOne(tester, id: id, target: t, combo: combo, env: env, driver: driver);
         });
@@ -96,8 +97,9 @@ class UiMap {
         if (combo == combos.first) _writeRoutes(env, tree, targets, kind: 'navigator');
         while (tester.takeException() != null) {}
         if (env.mode == 'list') return;
+        final firstLocale = env.config.locales.isEmpty ? null : env.config.locales.first;
         for (final t in targets.where((t) => !t.skipped)) {
-          final id = _idFor(t, combo);
+          final id = _idFor(t, combo, firstLocale: combo.locale == firstLocale);
           // ignore: avoid_print
           print('ui_map $id');
           await _captureOne(tester, id: id, target: t, combo: combo, env: env, driver: driver, rethrowFailures: false);
@@ -108,31 +110,38 @@ class UiMap {
 
   static Iterable<_Combo> _combos(_Env env) sync* {
     final c = env.config;
+    final locales = c.locales.isEmpty ? <String?>[null] : c.locales.cast<String?>();
     for (final device in c.devices) {
       for (final theme in c.themes) {
         for (final platform in c.platforms) {
           for (final scale in c.textScales) {
-            yield _Combo(
-              device: device,
-              theme: theme,
-              platform: platform,
-              textScale: scale,
-              explore: env.explore &&
-                  scale == 1.0 &&
-                  theme == c.themes.first &&
-                  platform == c.platforms.first &&
-                  device == c.devices.first,
-            );
+            for (final locale in locales) {
+              yield _Combo(
+                device: device,
+                theme: theme,
+                platform: platform,
+                textScale: scale,
+                locale: locale,
+                explore: env.explore &&
+                    scale == 1.0 &&
+                    theme == c.themes.first &&
+                    platform == c.platforms.first &&
+                    device == c.devices.first &&
+                    locale == locales.first,
+              );
+            }
           }
         }
       }
     }
   }
 
-  static String _idFor(ScreenTarget t, _Combo c) {
+  static String _idFor(ScreenTarget t, _Combo c, {bool firstLocale = true}) {
     final scale = c.textScale == 1.0 ? '' : '__x${_fmtScale(c.textScale)}';
     final sc = t.scenario == null ? '' : '__s-${slugForScenario(t.scenario!)}';
-    return '${slugForLocation(t.location)}${sc}__${c.device.name}__${c.theme}__${c.platform}$scale';
+    final kb = t.keyboard ? '__kb' : '';
+    final loc = c.locale == null || firstLocale ? '' : '__${c.locale}';
+    return '${slugForLocation(t.location)}$sc${kb}__${c.device.name}__${c.theme}__${c.platform}$scale$loc';
   }
 
   /// Runs the reset hook, then the screen's scenario (or the default one).
@@ -204,6 +213,8 @@ class UiMap {
       'theme': theme,
       'platform': platform,
       'text_scale': textScale,
+      if (combo.locale != null) 'locale': combo.locale,
+      if (target.keyboard) 'keyboard': true,
       if (target.scenario != null || config.defaultScenario != null)
         'scenario': target.scenario ?? config.defaultScenario,
       'status': 'ok',
@@ -224,6 +235,15 @@ class UiMap {
     if (textScale != 1.0) {
       tester.platformDispatcher.textScaleFactorTestValue = textScale;
     }
+    if (combo.locale != null) {
+      final parts = combo.locale!.split(RegExp('[-_]'));
+      tester.platformDispatcher.localesTestValue = [
+        Locale(parts.first, parts.length > 1 ? parts[1] : null),
+      ];
+      tester.platformDispatcher.localeTestValue = tester.platformDispatcher.locales.first;
+    }
+    final minTap = config.minTapSizeFor(platform);
+    result['min_tap_size'] = minTap;
 
     final previousPlatform = debugDefaultTargetPlatformOverride;
     debugDefaultTargetPlatformOverride = switch (platform) {
@@ -250,6 +270,19 @@ class UiMap {
       if (scenarioProblem != null) result['scenario_issue'] = scenarioProblem;
       await driver.open(tester, target.location, themeMode, wrap);
       await _settle(tester, config);
+      if (target.keyboard) {
+        // Focus the first text field and raise a keyboard-sized bottom inset,
+        // so CTA reachability and overflow with the keyboard open are visible.
+        final fields = find.byType(EditableText);
+        if (fields.evaluate().isNotEmpty) {
+          await tester.showKeyboard(fields.first);
+          result['keyboard_focused'] = true;
+        } else {
+          result['keyboard_focused'] = false;
+        }
+        tester.view.viewInsets = FakeViewPadding(bottom: config.keyboardInset * device.dpr);
+        await _settle(tester, config);
+      }
       final landed = driver.snapshot(tester).location;
       if (landed != target.location && landed != target.location.split('?').first) {
         result['redirected_to'] = landed;
@@ -311,7 +344,7 @@ class UiMap {
         File(semPath).writeAsStringSync(dump);
         result['semantics'] = p.relative(semPath, from: outDir);
         result['sha256_semantics'] = sha256.convert(utf8.encode(dump)).toString();
-        final tappables = collectTappables(root, dpr: device.dpr, minTapSize: config.minTapSize);
+        final tappables = collectTappables(root, dpr: device.dpr, minTapSize: minTap);
         if (explore) {
           result['edges'] = (await _explore(
             tester,
@@ -329,13 +362,11 @@ class UiMap {
         result['tappables_count'] = tappables.length;
         result['tappables_below_min'] = [
           for (final t in tappables)
-            if ((t.width < config.minTapSize || t.height < config.minTapSize) && !t.nestedInLargerTarget)
-              t.toJson(),
+            if ((t.width < minTap || t.height < minTap) && !t.nestedInLargerTarget) t.toJson(),
         ];
         result['tappables_below_min_nested'] = [
           for (final t in tappables)
-            if ((t.width < config.minTapSize || t.height < config.minTapSize) && t.nestedInLargerTarget)
-              t.toJson(),
+            if ((t.width < minTap || t.height < minTap) && t.nestedInLargerTarget) t.toJson(),
         ];
       } else {
         result['semantics'] = null;
@@ -349,6 +380,10 @@ class UiMap {
       debugDisableShadows = previousShadows;
       debugDefaultTargetPlatformOverride = previousPlatform;
       if (textScale != 1.0) tester.platformDispatcher.clearTextScaleFactorTestValue();
+      if (combo.locale != null) {
+        tester.platformDispatcher.clearLocalesTestValue();
+        tester.platformDispatcher.clearLocaleTestValue();
+      }
       tester.view.reset();
       result['duration_ms'] = sw.elapsedMilliseconds;
       _writeJson(p.join(resultsDir.path, '$id.json'), result);
@@ -522,6 +557,7 @@ class _Combo {
     required this.platform,
     required this.textScale,
     required this.explore,
+    this.locale,
   });
 
   final DeviceSpec device;
@@ -529,8 +565,10 @@ class _Combo {
   final String platform;
   final double textScale;
   final bool explore;
+  final String? locale;
 
-  String get id => '${device.name}__${theme}__$platform${textScale == 1.0 ? '' : '__x$textScale'}';
+  String get id =>
+      '${device.name}__${theme}__$platform${textScale == 1.0 ? '' : '__x$textScale'}${locale == null ? '' : '__$locale'}';
 }
 
 class _Env {

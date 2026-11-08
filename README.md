@@ -272,6 +272,23 @@ Routes with `:params` need sample values in `ui_map.yaml`; screens that
 hit the network or platform channels at build time will render their
 error/empty branch (no HTTP in `flutter test`).
 
+## Coverage: quick and extended profiles
+
+`map.json` has a `coverage` block and `MAP.md` a "Coverage" section
+listing what was executed and, explicitly, what was not (dark theme, iOS,
+large text, other locales, keyboard open, explore, device-only checks).
+The audit skill reports anything not executed as not verified. Two
+profiles:
+
+| Profile | `ui_map.yaml` |
+|---|---|
+| quick (PRs) | one phone, light (+dark), android, `text_scales: [1.0]` |
+| extended (releases) | `devices: [{name: small, width: 360, height: 640, dpr: 2}, {name: phone, ...}]`, `themes: [light, dark]`, `platforms: [android, ios]`, `text_scales: [1.0, 1.3, 2.0]`, `locales: [en, it, ar]`, `keyboard: true` on form routes, `--explore` |
+
+`skills/audit-screens/references/device-checks.md` lists the 13 checks
+that need a device (screen reader order, back gesture, real keyboard,
+reduce motion, permissions, offline) with steps and pass criteria.
+
 ## Keep screenshots up to date: baseline, diff, check
 
 ```bash
@@ -343,10 +360,13 @@ platforms: [android]        # android | ios
 text_scales: [1.0, 1.3]     # large-text variants get an __x1.3 id suffix
 settle_ms: 600              # fixed pumps; infinite spinners are fine
 export_scale: 2             # PNG = logical size × 2
-min_tap_size: 48
+min_tap_size: { android: 48, ios: 44 }   # per platform, or one number
+keyboard_inset: 300         # dp, for routes with keyboard: true
+locales: []                 # e.g. [en, it, ar]; others get an id suffix
 routes:
   "/notes/:id": { params: { id: "1" } }
-  "/notes":     { variants: ["?state=empty", "?state=loading", "?state=error"] }
+  "/notes":     { variants: ["?state=empty", "?state=loading", "?state=error"], scenarios: [empty] }
+  "/login":     { keyboard: true }   # extra capture with the keyboard open (__kb)
   "/debug":     { skip: true }
 exclude: []
 fonts: {}                   # family -> font files, for custom fonts

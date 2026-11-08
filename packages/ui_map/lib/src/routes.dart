@@ -126,6 +126,7 @@ class ScreenTarget {
     required this.location,
     this.skippedReason,
     this.scenario,
+    this.keyboard = false,
   });
 
   final String routePath;
@@ -134,6 +135,9 @@ class ScreenTarget {
 
   /// Factory scenario to set up before opening the screen; null = default.
   final String? scenario;
+
+  /// Capture with the soft keyboard open.
+  final bool keyboard;
 
   /// Non-null when the route cannot be rendered (missing params, excluded).
   final String? skippedReason;
@@ -180,6 +184,9 @@ List<ScreenTarget> expandTargets(List<RouteNode> tree, UiMapConfig config) {
     }
     for (final sc in opts.scenarios) {
       targets.add(ScreenTarget(routePath: path, routeName: r.name, location: location, scenario: sc));
+    }
+    if (opts.keyboard) {
+      targets.add(ScreenTarget(routePath: path, routeName: r.name, location: location, keyboard: true));
     }
   }
   return targets;

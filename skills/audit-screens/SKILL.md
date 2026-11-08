@@ -77,6 +77,26 @@ app is small): `map.json` then has `edges` (what every tap does),
   opened with `go` instead of `push` loses the back stack; a modal
   creation flow should be `push`.
 
+Read `coverage` in `map.json` (also rendered as "Coverage" in `MAP.md`):
+what was executed (devices, themes, platforms, text scales, locales,
+scenarios, keyboard-open screens, explore) and the `not_executed` list.
+Before auditing, decide with the developer whether the quick profile is
+enough or the extended one is needed:
+
+| Profile | `ui_map.yaml` | Use |
+|---|---|---|
+| quick | one phone, light (+dark if the app has it), android, `text_scales: [1.0]` | first pass, pull requests |
+| extended | a small phone (360×640) and a large one, both themes, `platforms: [android, ios]`, `text_scales: [1.0, 1.3, 2.0]`, every supported locale incl. an RTL one, `keyboard: true` on form routes, `--explore` | release audits |
+
+Everything in `not_executed` is `not_checked` in the summary, with the
+yaml change that would execute it. Device-only behaviour (screen reader,
+focus, back gesture, real keyboard, plugins, haptics, reduce motion) goes
+in the summary's "Device checks" table from
+`references/device-checks.md`, each as `pass`, `fail` or `not run`.
+Text scale 1.3 and 2.0 captures approximate the platform's large-text
+setting (font scaling only, no bold text, no display-size change), so a
+pass there is "likely fine", a fail is real.
+
 If `fonts.warnings` is non-empty, say so: glyph-level findings (type scale,
 line length) are unreliable with the fallback font.
 
@@ -155,9 +175,11 @@ Create `.ui-map/audit/` and write:
   Why it matters, Fix (name the Flutter widget or theme property), Severity.
   Keep each file under ~60 lines.
 - `SUMMARY.md`: capture info (date, screens, fonts warnings, skipped
-  routes), a **Capture limits** section listing every `capture_issue` and
-  `not_checked` item (what was not verified and what would verify it), the
-  single highest-leverage change, cross-screen findings
+  routes), a **Coverage** line (executed combinations) with a **Capture
+  limits** section listing every `capture_issue`, `not_checked` item and
+  `not_executed` combination (what was not verified and what would verify
+  it), a **Device checks** table (D1-D13 from `references/device-checks.md`,
+  each pass / fail / not run), the single highest-leverage change, cross-screen findings
   (inconsistent spacing systems, hardcoded colours, dark mode gaps, missing
   states), a table of locations with their worst severity, and the Mermaid
   tree from `MAP.md` with nodes coloured by worst severity

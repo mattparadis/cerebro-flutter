@@ -171,7 +171,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 8. Distinguere requisiti, default ed eccezioni
 
-- [ ] Rivedere gli assoluti e risolvere le contraddizioni tra reference e checklist.
+- [x] Rivedere gli assoluti e risolvere le contraddizioni tra reference e checklist. *(fatto 2026-11-08: legenda requisito/default/contesto in design-screen e nelle reference; strategia adattiva Material+`.adaptive` ammessa; politica di validazione dei form; `go` su route figlia vs top-level giudicato dal pop osservato; `min_tap_size` per piattaforma nel tool)*
 
 **Come risolvere:**
 
@@ -193,7 +193,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 9. Definire una matrice minima proporzionata al progetto
 
-- [ ] Rendere obbligatoria una scelta esplicita di dispositivi, piattaforme, accessibilità e contenuti da verificare.
+- [x] Rendere obbligatoria una scelta esplicita di dispositivi, piattaforme, accessibilità e contenuti da verificare. *(fatto 2026-11-08: blocco `coverage` con `not_executed` in map.json e MAP.md; profili quick/extended; cattura con tastiera (`keyboard: true`, `__kb`) e `locales`; `references/device-checks.md` con 13 controlli su dispositivo. Non fatto: RTL automatico oltre al locale, testi lunghi generati)*
 
 **Problema:** il setup predefinito usa un telefono Android e testo a scala 1.0. La skill verifica 1.3 solo quando già configurato. Questo non sostiene una promessa generale di correttezza mobile.
 

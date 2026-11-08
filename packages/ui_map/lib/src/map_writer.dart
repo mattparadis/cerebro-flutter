@@ -37,10 +37,32 @@ class MapWriter {
     ];
     final noEffect = edges.where((e) => e['kind'] == 'no_observed_effect' || e['kind'] == 'none').toList();
     final stateChanges = edges.where((e) => e['kind'] == 'state_change').toList();
+    final cfg = (routes['config'] as Map?) ?? const {};
+    Set<Object?> distinct(String key) => {for (final s in screens) s[key]}..removeWhere((v) => v == null);
+    final coverage = <String, Object?>{
+      'devices': [for (final d in (cfg['devices'] as List?) ?? const []) (d as Map)['name']],
+      'themes': distinct('theme').toList(),
+      'platforms': distinct('platform').toList(),
+      'text_scales': distinct('text_scale').toList(),
+      'locales': distinct('locale').toList(),
+      'scenarios': distinct('scenario').toList(),
+      'keyboard_screens': screens.where((s) => s['keyboard'] == true).length,
+      'explored': edges.isNotEmpty,
+      'not_executed': [
+        if (!distinct('theme').contains('dark')) 'dark theme',
+        if (!distinct('platform').contains('ios')) 'ios platform (Cupertino idiom, 44 pt targets)',
+        if (!distinct('text_scale').any((v) => (v as num) >= 1.3)) 'large text (text_scales 1.3+)',
+        if (distinct('locale').length < 2) 'other locales / RTL',
+        if (screens.every((s) => s['keyboard'] != true)) 'keyboard open (routes.<path>.keyboard: true)',
+        if (edges.isEmpty) 'navigation edges (--explore)',
+        'device-only checks: TalkBack/VoiceOver, focus order, back gesture, real keyboard, plugins, haptics, reduce motion',
+      ],
+    };
     final map = <String, Object?>{
       'generated_at': DateTime.now().toUtc().toIso8601String(),
       'flutter_version': flutterVersion,
       'config': routes['config'],
+      'coverage': coverage,
       'fonts': fonts,
       'routes_tree': routes['tree'],
       'skipped': skipped,
@@ -144,6 +166,23 @@ class MapWriter {
       }
     }
 
+    final cov = map['coverage'] as Map?;
+    if (cov != null) {
+      b.writeln('## Coverage');
+      b.writeln();
+      b.writeln('Executed: devices ${cov['devices']} · themes ${cov['themes']} · platforms ${cov['platforms']} · '
+          'text scales ${cov['text_scales']} · locales ${(cov['locales'] as List).isEmpty ? '[app default]' : cov['locales']} · '
+          'scenarios ${(cov['scenarios'] as List).isEmpty ? '[none]' : cov['scenarios']} · '
+          'keyboard-open screens ${cov['keyboard_screens']} · explored ${cov['explored']}.');
+      b.writeln();
+      b.writeln('Not executed (do not report these as verified):');
+      b.writeln();
+      for (final n in (cov['not_executed'] as List)) {
+        b.writeln('- $n');
+      }
+      b.writeln();
+    }
+
     final limits = <String>[];
     final fontsMap = map['fonts'] as Map?;
     for (final w in (fontsMap?['warnings'] as List?) ?? const []) {
@@ -207,7 +246,9 @@ class MapWriter {
         if (s['error'] != null) notes.add('${s['error']}');
         final png = s['png'];
         final img = png == null ? '' : '<img src="$png" width="120" alt="${s['id']}">';
-        final sc = s['scenario'] == null ? '' : ' · scenario `${s['scenario']}`';
+        final sc = (s['scenario'] == null ? '' : ' · scenario `${s['scenario']}`') +
+            (s['keyboard'] == true ? ' · keyboard' : '') +
+            (s['locale'] == null ? '' : ' · ${s['locale']}');
         if (s['scenario_issue'] != null) notes.add('${s['scenario_issue']}');
         b.writeln('| ${s['device']} · ${s['theme']} · ${s['platform']}$sc | $img | ${s['status']} | ${notes.join('; ')} |');
       }
