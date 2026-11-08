@@ -18,7 +18,11 @@ class NavEdge {
   /// Location after the tap (equal to [from] when nothing navigated).
   final String to;
 
-  /// `push`, `pop`, `go`, `overlay`, `none`, `error`.
+  /// `push`, `pop`, `go`, `overlay`, `state_change`, `no_observed_effect`,
+  /// `error`. `state_change` = same page, but the semantics tree changed
+  /// (filter applied, page scrolled, item expanded, text entered).
+  /// `no_observed_effect` = nothing the harness can see changed; it is an
+  /// observation, not proof that the control is broken.
   final String kind;
 
   /// `dialog`, `sheet`, `snackbar`, `menu` when [kind] is `overlay`.
@@ -47,13 +51,15 @@ String classifyEdge({
   required int depthAfter,
   String? overlay,
   String? error,
+  bool contentChanged = false,
 }) {
   if (error != null) return 'error';
   if (overlay != null) return 'overlay';
-  if (to == from) return 'none';
+  // Stack depth first: pushing the same location again is still a push.
   if (depthAfter > depthBefore) return 'push';
   if (depthAfter < depthBefore) return 'pop';
-  return 'go';
+  if (to != from) return 'go';
+  return contentChanged ? 'state_change' : 'no_observed_effect';
 }
 
 /// Mermaid graph of explored edges: nodes are locations, overlays hang off
@@ -67,7 +73,7 @@ String renderEdgesMermaid(List<Map<String, Object?>> edges) {
   var overlayCount = 0;
   for (final e in edges) {
     final kind = '${e['kind']}';
-    if (kind == 'none' || kind == 'error') continue;
+    if (kind == 'none' || kind == 'no_observed_effect' || kind == 'state_change' || kind == 'error') continue;
     final from = '${e['from']}', to = '${e['to']}';
     final label = _escape('${e['label']}');
     final a = idFor(from);

@@ -106,9 +106,12 @@ double _distance(int a, int b) {
   return math.sqrt((dr * dr + dg * dg + db * db).toDouble());
 }
 
-/// Most frequent colour inside the rect that is at least [minDistance]
-/// away from [foreground] (the known text colour). Returns null when the
-/// rect is too small or every pixel is close to the foreground.
+/// Most frequent colour inside the rect once the text's own pixels are
+/// removed: pixels within [textTolerance] of [foreground] (the known text
+/// colour). Anti-aliased blends stay in, but they are always a minority
+/// next to the background, so the mode is the background even when text
+/// and background are close (e.g. #F0F0F0 on white). Returns null only when
+/// nothing but text pixels is left.
 int? sampleBackground(
   Uint8List rgba,
   int imageWidth,
@@ -118,7 +121,7 @@ int? sampleBackground(
   required int width,
   required int height,
   required int foreground,
-  double minDistance = 60,
+  double textTolerance = 12,
 }) {
   final x0 = left.clamp(0, imageWidth), y0 = top.clamp(0, imageHeight);
   final x1 = (left + width).clamp(0, imageWidth), y1 = (top + height).clamp(0, imageHeight);
@@ -130,8 +133,8 @@ int? sampleBackground(
       final i = (y * imageWidth + x) * 4;
       final r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
       final c = (r << 16) | (g << 8) | b;
-      if (_distance(c, foreground) < minDistance) continue;
-      final key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+      if (_distance(c, foreground) <= textTolerance) continue;
+      final key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
       counts[key] = (counts[key] ?? 0) + 1;
       final s = sums.putIfAbsent(key, () => [0, 0, 0]);
       s[0] += r;

@@ -75,8 +75,9 @@ With `--explore` (or `explore: true`), the harness also taps every
 semantics target of each screen on a fresh instance and records where it
 leads: a `push`, `pop` or `go` to another location, an overlay (dialog,
 sheet, snackbar), an `error` (for instance "nothing to pop" on a screen
-reached by deep link), or nothing. `map.json` gets `edges` and
-`dead_taps`; `MAP.md` gets a second Mermaid graph with the **real**
+reached by deep link), a `state_change` (same page, semantics tree
+changed: filter, expand, page swipe) or `no_observed_effect`. `map.json`
+gets `edges` and `no_effect_taps` (suspects, not confirmed defects); `MAP.md` gets a second Mermaid graph with the **real**
 navigation edges labelled by the control that triggers them. On the demo
 this takes about 20 s for 62 taps.
 
@@ -141,6 +142,9 @@ and `map.json` already carries deterministic findings, for example on
 Contrast is measured, not estimated: the text colour comes from the
 rendered `RenderParagraph`, the background is sampled from the screenshot
 under it, and the threshold follows WCAG AA (4.5, or 3.0 for large text).
+`contrast_coverage` says how many texts were measured and
+`contrast_not_measurable` lists the rest with a reason, so absence from
+`low_contrast` is a pass only for measured texts.
 
 Then, in the same directory, ask Claude Code or Codex:
 
@@ -309,11 +313,13 @@ Regex rules for the design defects the Dart analyzer does not know about,
 each with `file:line`: `hardcoded-color`, `literal-font-size`,
 `empty-handler`, `small-icon-button`, `deprecated-will-pop-scope`,
 `platform-io-check`, `no-safe-area`, `network-image-no-error-builder`,
-`gesture-without-semantics`, `pump-and-settle` (tests). Theme files and
-generated code are excluded by default; tune `lint.exclude` and
-`lint.rules` in `ui_map.yaml`. `check` runs capture, diff and lint
-together. The audit skill treats lint errors and warnings as confirmed
-findings.
+`gesture-without-semantics`, `pump-and-settle` (tests). Severities:
+`error` and `warning` are structural defects; `hardcoded-color` and
+`literal-font-size` are `convention` findings, defects only when the
+rendered result is wrong. `// ui_map: ignore <reason>` on a line is a
+motivated exception. Theme files and generated code are excluded by
+default; tune `lint.exclude` and `lint.rules` in `ui_map.yaml`. `check`
+runs capture, diff and lint together.
 
 ## `ui_map.yaml`
 

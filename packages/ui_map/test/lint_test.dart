@@ -48,6 +48,37 @@ class S extends StatelessWidget {
     ]));
     expect(rules.where((r) => r.startsWith('hardcoded-color')).length, 2, reason: 'transparent is allowed');
     expect(f.firstWhere((e) => e.rule == 'deprecated-will-pop-scope').severity, 'error');
+    expect(f.firstWhere((e) => e.rule == 'hardcoded-color').severity, 'convention');
+    expect(f.firstWhere((e) => e.rule == 'small-icon-button').severity, 'warning');
+  });
+
+  test('small-icon-button: siblings are not constraints, real constraints are (review item 3)', () {
+    const siblings = '''
+Column(children: [
+  const SizedBox(height: 8),
+  IconButton(onPressed: () {}, icon: const Icon(Icons.edit)),
+  SizedBox(width: 24, child: Text('x')),
+  IconButton(onPressed: () {}, icon: const Icon(Icons.add)),
+])
+''';
+    expect(lintFile('lib/a.dart', siblings).where((f) => f.rule == 'small-icon-button'), isEmpty);
+    const constrained = '''
+SizedBox(
+  width: 32,
+  height: 32,
+  child: IconButton(padding: EdgeInsets.zero, onPressed: () {}, icon: const Icon(Icons.edit)),
+)
+''';
+    final f = lintFile('lib/b.dart', constrained).where((f) => f.rule == 'small-icon-button').toList();
+    expect(f, hasLength(1));
+    expect(f.single.message, contains('32 dp'));
+    const big = 'SizedBox(width: 56, height: 56, child: IconButton(onPressed: () {}, icon: Icon(Icons.x)))';
+    expect(lintFile('lib/c.dart', big).where((f) => f.rule == 'small-icon-button'), isEmpty);
+  });
+
+  test('inline ignore disables rules for that line', () {
+    const src = "final c = Color(0xFF000000); // ui_map: ignore brand colour\nfinal d = Color(0xFF111111);";
+    expect(lintFile('lib/a.dart', src).map((f) => f.line), [2]);
   });
 
   test('theme files and comments are exempt from style rules; tests only get pumpAndSettle', () {
@@ -70,7 +101,7 @@ class S extends StatelessWidget {
     final f = lintFile('lib/a.dart', 'Color(0xFF000000)', options: const LintOptions(rules: {'hardcoded-color': false}));
     expect(f, isEmpty);
     final md = renderLintMarkdown(lintFile('lib/a.dart', 'Color(0xFF000000)'));
-    expect(md, contains('## hardcoded-color (warning, 1)'));
+    expect(md, contains('## hardcoded-color (convention, 1)'));
     expect(md, contains('`lib/a.dart:1`'));
   });
 }

@@ -35,7 +35,8 @@ class MapWriter {
       for (final s in screens)
         for (final e in (s['edges'] as List?) ?? const []) (e as Map).cast<String, Object?>(),
     ];
-    final deadTaps = edges.where((e) => e['kind'] == 'none').toList();
+    final noEffect = edges.where((e) => e['kind'] == 'no_observed_effect' || e['kind'] == 'none').toList();
+    final stateChanges = edges.where((e) => e['kind'] == 'state_change').toList();
     final map = <String, Object?>{
       'generated_at': DateTime.now().toUtc().toIso8601String(),
       'flutter_version': flutterVersion,
@@ -51,10 +52,11 @@ class MapWriter {
         'with_small_tappables': screens.where((s) => ((s['tappables_below_min'] as List?) ?? []).isNotEmpty).length,
         'with_low_contrast': screens.where((s) => ((s['low_contrast'] as List?) ?? []).isNotEmpty).length,
         'explored_taps': edges.length,
-        'dead_taps': deadTaps.length,
+        'no_effect_taps': noEffect.length,
+        'state_change_taps': stateChanges.length,
       },
       'edges': edges,
-      'dead_taps': deadTaps,
+      'no_effect_taps': noEffect,
       'screens': screens,
     };
     File(p.join(outDir, 'map.json')).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(map));
@@ -119,24 +121,51 @@ class MapWriter {
       b.writeln('## Navigation graph (explored by tapping)');
       b.writeln();
       b.writeln('Thick arrows push, thin arrows pop, dashed arrows open an overlay. '
-          '${summary['explored_taps']} taps explored, ${summary['dead_taps']} did nothing.');
+          '${summary['explored_taps']} taps explored: ${summary['state_change_taps']} changed the '
+          'page content in place, ${summary['no_effect_taps']} had no effect the harness could observe.');
       b.writeln();
       b.writeln('```mermaid');
       b.write(renderEdgesMermaid(edges));
       b.writeln('```');
       b.writeln();
-      final dead = (map['dead_taps'] as List?)?.cast<Map>() ?? const [];
+      final dead = (map['no_effect_taps'] as List?)?.cast<Map>() ?? const [];
       if (dead.isNotEmpty) {
-        b.writeln('### Taps that did nothing');
+        b.writeln('### Taps with no observed effect');
         b.writeln();
-        b.writeln('Controls that expose a tap action but neither navigate nor open anything. '
-            'Either unimplemented handlers or state changes the capture cannot see (toggles, text fields).');
+        b.writeln('Controls with a tap action after which neither the location, the stack, an overlay '
+            'nor the semantics tree changed. Suspects, not confirmed defects: focus-only controls, '
+            'actions whose effect is outside the screen (network, clipboard, haptics) and handlers '
+            'that are genuinely empty all look the same here. Confirm in the source.');
         b.writeln();
         for (final d in dead) {
           b.writeln('- `${d['from']}` · "${d['label']}" at (${d['x']}, ${d['y']})');
         }
         b.writeln();
       }
+    }
+
+    final limits = <String>[];
+    final fontsMap = map['fonts'] as Map?;
+    for (final w in (fontsMap?['warnings'] as List?) ?? const []) {
+      limits.add('fonts: $w');
+    }
+    for (final s in screens) {
+      if (s['status'] == 'error') limits.add('`${s['location']}` (${s['theme']}): did not render: ${s['error']}');
+      if (s['redirected_to'] != null) limits.add('`${s['location']}`: redirected to `${s['redirected_to']}` on open');
+      final nofam = (s['text_without_font_family'] as List?) ?? const [];
+      if (nofam.isNotEmpty) limits.add('`${s['location']}` (${s['theme']}): ${nofam.length} text(s) without font family render as blocks');
+      final nm = (s['contrast_not_measurable'] as List?) ?? const [];
+      if (nm.isNotEmpty) limits.add('`${s['location']}` (${s['theme']}): contrast not measurable for ${nm.length} text(s)');
+    }
+    if (limits.isNotEmpty) {
+      b.writeln('## Capture limits');
+      b.writeln();
+      b.writeln('Harness limits, not app defects. Each one is something the audit cannot judge from this capture.');
+      b.writeln();
+      for (final l in limits.toSet()) {
+        b.writeln('- $l');
+      }
+      b.writeln();
     }
 
     final skipped = (map['skipped'] as List?)?.cast<Map>() ?? const [];

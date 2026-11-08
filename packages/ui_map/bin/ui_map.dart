@@ -46,7 +46,7 @@ Future<void> main(List<String> argv) async {
         help: 'diff/check exit code 1 on: regressions (errors, new layout exceptions, new small '
             'targets), any change, or never.')
     ..addOption('lint-fail-on',
-        allowed: ['none', 'error', 'warning', 'info'],
+        allowed: ['none', 'error', 'warning', 'convention', 'info'],
         defaultsTo: 'error',
         help: 'lint/check exit code 1 when findings of this severity or higher exist.');
   final ArgResults args;
@@ -207,7 +207,7 @@ Future<int> _capture(String root, String configPath, String outDir, List<String>
       '${summary['error']} errors, ${summary['with_exceptions']} with layout exceptions, '
       '${summary['with_small_tappables']} with small tap targets, '
       '${summary['with_low_contrast']} with low-contrast text'
-      '${(summary['explored_taps'] as int) > 0 ? ', ${summary['explored_taps']} taps explored (${summary['dead_taps']} dead)' : ''}.');
+      '${(summary['explored_taps'] as int) > 0 ? ', ${summary['explored_taps']} taps explored (${summary['state_change_taps']} changed content, ${summary['no_effect_taps']} no observed effect)' : ''}.');
   stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'map.json'), from: root)} and MAP.md written.');
   if (testCode != 0 || (summary['error'] as int) > 0) return 1;
   return 0;
@@ -288,12 +288,12 @@ int _lint(String root, String configPath, String outDir, String failOn) {
     counts[f.severity] = (counts[f.severity] ?? 0) + 1;
   }
   stdout.writeln('ui_map lint: ${findings.length} findings · ${counts['error'] ?? 0} errors · '
-      '${counts['warning'] ?? 0} warnings · ${counts['info'] ?? 0} info.');
-  for (final f in findings.where((f) => f.severity != 'info').take(15)) {
+      '${counts['warning'] ?? 0} warnings · ${counts['convention'] ?? 0} convention · ${counts['info'] ?? 0} info.');
+  for (final f in findings.where((f) => f.severity == 'error' || f.severity == 'warning').take(15)) {
     stdout.writeln('  ${f.severity == 'error' ? '!!' : ' !'} ${f.file}:${f.line}  ${f.rule}  ${f.snippet}');
   }
   stdout.writeln('ui_map: ${p.relative(p.join(outDir, 'LINT.md'), from: root)} written.');
-  const rank = {'error': 3, 'warning': 2, 'info': 1, 'none': 0};
+  const rank = {'error': 4, 'warning': 3, 'convention': 2, 'info': 1, 'none': 0};
   final threshold = rank[failOn]!;
   if (threshold == 0) return 0;
   return findings.any((f) => rank[f.severity]! >= threshold) ? 1 : 0;

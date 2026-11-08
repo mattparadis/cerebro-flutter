@@ -53,13 +53,16 @@ lists (new layout exceptions, new small targets, screens that stopped
 rendering) as severity 3-4 findings.
 
 Run the capture with `--explore` when auditing navigation (or when the
-app is small): `map.json` then has `edges` (what every tap does) and
-`dead_taps`. Use them as evidence:
+app is small): `map.json` then has `edges` (what every tap does),
+`no_effect_taps` and the count of `state_change` taps. Use them as evidence:
 
-- a `dead_taps` entry on a button, tile with a chevron, chip or link is a
-  confirmed "looks interactive, does nothing" finding (severity 3 on
-  primary actions, 2 otherwise); ignore text fields, switches, checkboxes
-  and page indicators, whose effect is state the capture cannot see;
+- a `no_effect_taps` entry on a button, tile with a chevron, chip or link
+  is a `suspected` "looks interactive, does nothing" finding (severity 3 on
+  primary actions, 2 otherwise). Confirm it by reading the handler in the
+  source (`onPressed: () {}` or a missing `onTap` confirms; a handler that
+  calls the network, the clipboard or a plugin does not). `state_change`
+  edges (page content changed in place: filter, expand, page swipe) are
+  working controls, not findings;
 - an `error` edge saying "nothing to pop" means the screen is reachable by
   deep link without a parent stack and its close/back action crashes
   there (severity 2: guard with `context.canPop()` or use `go`);
@@ -78,34 +81,29 @@ light and dark variants side by side.
 1. Read the PNGs (they are images; look at them).
 2. Skim the semantics file: unlabeled buttons, images without labels, heading
    structure, reading order, duplicated labels.
-3. Run `dart run ui_map lint` and read `.ui-map/lint.json`: every
-   `error` or `warning` there is a confirmed finding with a `file:line`
-   (hardcoded colours, literal font sizes, empty handlers, small icon
-   buttons, deprecated `WillPopScope`, `Platform.isIOS` in UI code).
-   Attach each to the screen whose file it lives in; `info` items are
-   hints to verify on the screenshot, not findings by themselves.
-4. Take these as confirmed findings without further checking:
-   - every entry in `tappables_below_min` (touch target below the minimum,
-     coordinates and size are given);
-   - every entry in `low_contrast` (measured WCAG ratio of the rendered
-     text colour against the sampled background, with the required 4.5 or
-     3.0 threshold; quote `ratio`, `fg`, `bg`);
-   - every entry in `exceptions` (RenderFlex overflow, unbounded height, ...);
-   - screens with `status: error` (the route could not render in a test;
-     usually a missing dependency or side effect in the factory);
-   - `text_without_font_family`: texts whose `TextStyle` resolves to no
-     family (a `TextStyle(...)` that replaces the theme style instead of
-     merging it, e.g. inside `AnimatedDefaultTextStyle`). They render as
-     solid blocks in the PNG, so do not judge them visually; report them
-     once per screen as a theming inconsistency (severity 1-2: on device
-     they fall back to the platform font and ignore the app's family);
-   - `redirected_to`: the screen sent the user elsewhere on open (an auth
-     guard, a missing-argument fallback). Audit the screen it landed on
-     only once, and report the redirect itself if it loses context
-     (e.g. a deep link to a booking that lands on the home screen).
-   Do **not** report `tappables_below_min_nested`: those sit inside a larger
-   tappable parent (a Switch inside a ListTile) and the real hit area is fine.
-5. Go through `references/checklist.md` item by item. Mark each
+3. Run `dart run ui_map lint` and read `.ui-map/lint.json`.
+4. Classify every signal by **how it was obtained** before judging it.
+   Every finding carries one of four statuses, kept separate from
+   severity:
+
+   | Status | Meaning | Comes from |
+   |---|---|---|
+   | `confirmed` | reproduced by a measurement or an unambiguous structural fact | `tappables_below_min` (size and position), `low_contrast` (measured ratio, fg, bg), `exceptions` (layout overflow), lint `error`/`warning` (`file:line`), an `error` edge, a visible defect in the PNG that you can point at |
+   | `suspected` | plausible from one signal, needs a second look | `no_effect_taps` (focus-only controls, off-screen effects and empty handlers look the same), lint `convention` findings (hardcoded colour, literal font size), a `state_change` edge that looks wrong, visual judgement of spacing or hierarchy, contrast you estimated by eye |
+   | `not_checked` | the capture could not cover it | items in `contrast_not_measurable`, screens or states not captured, large text when `text_scales` has no 1.3, behaviour needing a device (haptics, keyboard, real network) |
+   | `capture_issue` | a limit of the harness, **not** an app defect | `status: error` screens, `redirected_to`, `text_without_font_family` (blocks in the PNG), `fonts.warnings`, mocks missing in the factory, routes skipped for missing params |
+
+   A `suspected` finding becomes `confirmed` only with a second, independent
+   piece of evidence: the source line, the semantics dump, or a measured
+   value. Say which. A `capture_issue` goes in the summary's "Capture limits"
+   section and is never counted as a defect, however severe it would be if
+   real.
+5. Do **not** report `tappables_below_min_nested` as defects by default,
+   but check the parent: a 32 dp icon inside a 56 dp `ListTile` is fine only
+   if tapping the tile does the same thing as the icon. If the parent does
+   something else (opens the row) while the icon does another (deletes),
+   the small icon is a confirmed finding.
+6. Go through `references/checklist.md` item by item. Mark each
    `present`, `partial`, `missing`, `n/a` or `can't tell`. There is no score.
    Then do the heuristic sweep in `references/heuristics.md` (Nielsen's 10)
    and name the heuristic in the "Why it matters" of the findings it
@@ -113,7 +111,8 @@ light and dark variants side by side.
    For platform specifics (Material 3 tokens, Apple HIG, Cupertino
    mapping) consult the `design-screen` skill's `references/` if it is
    installed alongside this one.
-6. Severity per finding, Nielsen's scale:
+7. Severity per finding, Nielsen's scale (independent of status: a
+   `suspected` finding can be severity 4):
    - 4 catastrophic: blocks a task or violates platform rules (no way back,
      unreadable text, overflow hiding content);
    - 3 major: hurts most users (touch target < 48 dp, contrast < 4.5:1,
@@ -149,14 +148,17 @@ Create `.ui-map/audit/` and write:
   Why it matters, Fix (name the Flutter widget or theme property), Severity.
   Keep each file under ~60 lines.
 - `SUMMARY.md`: capture info (date, screens, fonts warnings, skipped
-  routes), the single highest-leverage change, cross-screen findings
+  routes), a **Capture limits** section listing every `capture_issue` and
+  `not_checked` item (what was not verified and what would verify it), the
+  single highest-leverage change, cross-screen findings
   (inconsistent spacing systems, hardcoded colours, dark mode gaps, missing
   states), a table of locations with their worst severity, and the Mermaid
   tree from `MAP.md` with nodes coloured by worst severity
   (`style n3 fill:#f8d7da` for 3-4, `#fff3cd` for 2, none otherwise).
 
-Finish with a short message: screens audited, top three findings with
-severity, path to `SUMMARY.md`, and anything you could not check.
+Finish with a short message: screens audited, counts of confirmed and
+suspected findings, top three findings with severity and status, path to
+`SUMMARY.md`, and the capture limits.
 
 ## Scenario hook (for the developer)
 

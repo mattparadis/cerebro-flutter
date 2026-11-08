@@ -26,9 +26,10 @@ or `colorSchemeSeed:`. For a brand palette, `ColorScheme.fromSeed(..., primary: 
 overrides a role while keeping the rest harmonised. Dark theme comes from
 the same seed with `Brightness.dark`; never hand-tune two palettes.
 
-Contrast: `on*` on its container is always AA. Mixed pairs must be
-checked: `onSurfaceVariant` on `surfaceContainerHighest` is fine; custom
-greys are not.
+Contrast: `on*` on its own container meets AA for seed-generated
+schemes; overriding a role (`ColorScheme.fromSeed(..., primary: brand)`)
+or using a role on a different surface voids that guarantee. Measure
+mixed pairs (`low_contrast` in the capture) instead of assuming.
 
 ## Type scale (TextTheme role → size/weight, sp)
 

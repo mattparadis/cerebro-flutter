@@ -248,6 +248,15 @@ class UiMap {
         result['low_contrast'] = report.low.map((e) => e.toJson()).toList();
         result['low_contrast_icons'] = report.lowIcons.map((e) => e.toJson()).toList();
         result['text_without_font_family'] = report.noFontFamily;
+        result['contrast_not_measurable'] = report.notMeasurable;
+        result['contrast_coverage'] = {
+          'found': report.found,
+          'measured': report.checked,
+          'failed': report.low.length,
+          'icons_failed': report.lowIcons.length,
+          'not_measurable': report.notMeasurable.length,
+          'no_font_family': report.noFontFamily.length,
+        };
       }
       result['png'] = p.relative(pngPath, from: outDir);
       result['sha256_png'] = sha256.convert(File(pngPath).readAsBytesSync()).toString();
@@ -336,6 +345,7 @@ class UiMap {
       final before = driver.snapshot(tester);
       final depthBefore = before.depth;
       final from = before.location;
+      final semanticsBefore = _semanticsFingerprint(tester);
       String? error;
       try {
         await tester.tapAt(Offset(t.left + t.width / 2, t.top + t.height / 2));
@@ -351,6 +361,7 @@ class UiMap {
       final afterSnap = driver.snapshot(tester);
       final depthAfter = afterSnap.depth;
       final to = afterSnap.location;
+      final contentChanged = _semanticsFingerprint(tester) != semanticsBefore;
       String? overlay;
       if (find.byType(Dialog).evaluate().isNotEmpty || find.byType(AlertDialog).evaluate().isNotEmpty) {
         overlay = 'dialog';
@@ -375,6 +386,7 @@ class UiMap {
           depthAfter: depthAfter,
           overlay: overlay,
           error: error,
+          contentChanged: contentChanged,
         ),
         overlay: overlay,
         error: error,
@@ -383,6 +395,17 @@ class UiMap {
       ));
     }
     return edges;
+  }
+
+  /// Cheap fingerprint of what assistive tech would read: labels, values,
+  /// flags and rects, without object ids. Changes when a filter is applied,
+  /// a page scrolls, an item expands or a field gets text.
+  static String _semanticsFingerprint(WidgetTester tester) {
+    final renderView = tester.binding.renderViews.firstWhere((r) => r.flutterView == tester.view);
+    final root = renderView.owner?.semanticsOwner?.rootSemanticsNode;
+    if (root == null) return '';
+    final dump = root.toStringDeep().replaceAll(RegExp(r'#[0-9a-f]{5}\b'), '');
+    return sha256.convert(utf8.encode(dump)).toString();
   }
 
   /// Draws the simulated status-bar and navigation-bar areas as translucent
@@ -545,12 +568,23 @@ class ContrastReport {
   const ContrastReport({
     required this.checked,
     required this.low,
+    this.found = 0,
     this.lowIcons = const [],
     this.noFontFamily = const [],
+    this.notMeasurable = const [],
   });
 
+  /// Text paragraphs found on the screen (icons and skipped ones included).
+  final int found;
+
+  /// Paragraphs actually measured. `found - checked` were skipped for the
+  /// reasons listed in [notMeasurable] / [noFontFamily] or are icons.
   final int checked;
   final List<LowContrast> low;
+
+  /// Texts that could not be measured, with the reason. Absence from [low]
+  /// never means "passed" for these.
+  final List<Map<String, Object?>> notMeasurable;
 
   /// Icon glyphs (private-use codepoints) below 3:1.
   final List<LowContrast> lowIcons;
@@ -571,25 +605,47 @@ ContrastReport measureTextContrast(
   required double scale,
 }) {
   var checked = 0;
+  var found = 0;
   final low = <LowContrast>[];
   final icons = <LowContrast>[];
   final noFamily = <Map<String, Object?>>[];
+  final notMeasurable = <Map<String, Object?>>[];
   final seen = <String>{};
+  void skip(String text, String reason, [Rect? rect]) {
+    notMeasurable.add({
+      'text': text.length > 40 ? '${text.substring(0, 40)}…' : text,
+      'reason': reason,
+      if (rect != null) 'x': Tappable._r(rect.left),
+      if (rect != null) 'y': Tappable._r(rect.top),
+    });
+  }
+
   for (final element in find.byType(RichText).evaluate()) {
     final ro = element.renderObject;
     if (ro is! RenderParagraph || !ro.attached || !ro.hasSize) continue;
     final span = ro.text;
     final plain = span.toPlainText().trim();
     if (plain.isEmpty) continue;
+    found++;
     final isIcon = plain.runes.length == 1 && _isPrivateUse(plain.runes.first);
     final style = _firstStyle(span);
     final color = style?.color;
-    if (color == null) continue;
     final offset = ro.localToGlobal(Offset.zero);
     final rect = offset & ro.size;
-    if (rect.isEmpty || rect.width < 2 || rect.height < 2) continue;
+    if (color == null) {
+      skip(plain, 'no colour in TextStyle (inherited from painter/theme at paint time)', rect);
+      continue;
+    }
+    if (rect.isEmpty || rect.width < 2 || rect.height < 2) {
+      skip(plain, 'rect too small or off-screen', rect);
+      continue;
+    }
     final key = '$plain|${rect.left.round()}|${rect.top.round()}';
     if (!seen.add(key)) continue;
+    if (_hasMultipleColours(span)) {
+      skip(plain, 'multiple span colours; only the first is measured', rect);
+      // still measured below with the first colour, but flagged as partial
+    }
     // No font family resolved: under `flutter test` this renders with the
     // FlutterTest font (solid blocks), so contrast is meaningless. Report
     // it instead: on device the platform font is used, and the text will
@@ -609,7 +665,10 @@ ContrastReport measureTextContrast(
     final w = (rect.width * scale).round(), h = (rect.height * scale).round();
     final fgOpaque = argb & 0xFFFFFF;
     final bg = sampleBackground(rgba, imageW, imageH, left: left, top: top, width: w, height: h, foreground: fgOpaque);
-    if (bg == null) continue;
+    if (bg == null) {
+      skip(plain, 'background not distinguishable from text pixels', rect);
+      continue;
+    }
     final fg = compositeOver(argb, bg);
     final ratio = contrastRatio(fg, bg);
     final fontSize = style?.fontSize ?? 14;
@@ -645,7 +704,26 @@ ContrastReport measureTextContrast(
   }
   low.sort((a, b) => a.ratio.compareTo(b.ratio));
   icons.sort((a, b) => a.ratio.compareTo(b.ratio));
-  return ContrastReport(checked: checked, low: low, lowIcons: icons, noFontFamily: noFamily);
+  return ContrastReport(
+    checked: checked,
+    found: found,
+    low: low,
+    lowIcons: icons,
+    noFontFamily: noFamily,
+    notMeasurable: notMeasurable,
+  );
+}
+
+bool _hasMultipleColours(InlineSpan span) {
+  final colours = <int>{};
+  void walk(InlineSpan s) {
+    final c = s.style?.color;
+    if (c != null) colours.add(c.toARGB32());
+    if (s is TextSpan) s.children?.forEach(walk);
+  }
+
+  walk(span);
+  return colours.length > 1;
 }
 
 bool _isPrivateUse(int rune) =>

@@ -17,7 +17,10 @@ class LintFinding {
 
   final String rule;
 
-  /// `error`, `warning` or `info`.
+  /// `error` (deprecated API / will break), `warning` (structural defect
+  /// visible to users), `convention` (bypasses the theme or project
+  /// conventions; a defect only if the rendered result is wrong) or `info`
+  /// (worth a look).
   final String severity;
   final String file;
   final int line;
@@ -43,10 +46,11 @@ class LintRule {
 }
 
 const lintRules = <String, LintRule>{
-  'hardcoded-color': LintRule('hardcoded-color', 'warning',
-      'Colour literal bypasses ColorScheme; dark mode and contrast are unverified.'),
-  'literal-font-size': LintRule('literal-font-size', 'warning',
-      'fontSize literal bypasses the TextTheme type scale.'),
+  'hardcoded-color': LintRule('hardcoded-color', 'convention',
+      'Colour literal bypasses ColorScheme: dark mode and contrast are not guaranteed by the theme. '
+      'Check the rendered result (low_contrast, dark capture) before calling it a defect.'),
+  'literal-font-size': LintRule('literal-font-size', 'convention',
+      'fontSize literal bypasses the TextTheme type scale; a defect only if it breaks hierarchy or large text.'),
   'empty-handler': LintRule('empty-handler', 'warning',
       'Empty onPressed/onTap: the control looks interactive but does nothing. Use null to disable.'),
   'small-icon-button': LintRule('small-icon-button', 'warning',
@@ -90,7 +94,7 @@ class LintOptions {
 final _colorLiteral = RegExp(r'\bColor\(0x[0-9A-Fa-f]{6,8}\)|\bColors\.(?!transparent\b)[a-zA-Z]+(\[\d+\]|\.shade\d+)?');
 final _fontSize = RegExp(r'\bfontSize:\s*\d+(\.\d+)?');
 final _emptyHandler = RegExp(r'\b(onPressed|onTap|onLongPress|onChanged)\s*:\s*\(\s*[_\w]*\s*\)\s*(async\s*)?\{\s*\}');
-final _sizedBox = RegExp(r'\bSizedBox(\.square)?\(');
+final _sizedBox = RegExp(r'\b(?:SizedBox(?:\.square)?|ConstrainedBox|Container)\(');
 final _dimension = RegExp(r'\b(?:width|height|dimension):\s*(\d+(?:\.\d+)?)');
 final _willPop = RegExp(r'\bWillPopScope\b');
 final _platformIo = RegExp(r'\bPlatform\.is(IOS|Android|MacOS|Windows|Linux)\b');
@@ -119,6 +123,8 @@ List<LintFinding> lintFile(String relPath, String source, {LintOptions options =
 
   for (var i = 0; i < lines.length; i++) {
     final line = lines[i];
+    // `// ui_map: ignore` (or `// ignore: ui_map`) on the line disables every rule for it.
+    if (_inlineIgnore.hasMatch(line)) continue;
     final code = _stripComment(line);
     if (code.trim().isEmpty) continue;
     if (isTest) {
@@ -132,15 +138,20 @@ List<LintFinding> lintFile(String relPath, String source, {LintOptions options =
     if (_emptyHandler.hasMatch(code)) add('empty-handler', i);
     if (_willPop.hasMatch(code)) add('deprecated-will-pop-scope', i);
     if (_platformIo.hasMatch(code)) add('platform-io-check', i);
-    if (_sizedBox.hasMatch(code)) {
-      final window = lines.skip(i).take(6).map(_stripComment).join('\n');
-      final small = _dimension
-          .allMatches(window)
-          .map((m) => double.parse(m.group(1)!))
-          .where((v) => v < 48)
-          .toList();
-      if (small.isNotEmpty && window.contains('IconButton(')) {
-        add('small-icon-button', i, '(${small.first.toStringAsFixed(0)} dp)');
+    final sb = _sizedBox.firstMatch(code);
+    if (sb != null) {
+      // Only the box's own argument list counts: a sibling `SizedBox(height: 8)`
+      // followed by an IconButton is not a constraint on the button.
+      final span = _balancedArguments(lines, i, _lineOffset(line, code, sb.end - 1));
+      if (span != null) {
+        final small = _dimension
+            .allMatches(span)
+            .map((m) => double.parse(m.group(1)!))
+            .where((v) => v < 48)
+            .toList();
+        if (small.isNotEmpty && RegExp(r'child:\s*(const\s+)?IconButton\(').hasMatch(span)) {
+          add('small-icon-button', i, '(${small.first.toStringAsFixed(0)} dp)');
+        }
       }
     }
     if (_gesture.hasMatch(code)) {
@@ -173,6 +184,38 @@ List<LintFinding> lintFile(String relPath, String source, {LintOptions options =
     }
   }
   return out;
+}
+
+final _inlineIgnore = RegExp(r'//\s*(ui_map:\s*ignore|ignore:\s*ui_map)');
+
+int _lineOffset(String line, String code, int idx) => idx;
+
+/// Text of the argument list that opens at [openParenIdx] on line [i],
+/// up to its matching `)`, spanning lines; null when unbalanced within
+/// 60 lines.
+String? _balancedArguments(List<String> lines, int i, int openParenIdx) {
+  final b = StringBuffer();
+  var depth = 0;
+  var started = false;
+  for (var l = i; l < lines.length && l < i + 60; l++) {
+    final text = _stripComment(lines[l]);
+    final start = l == i ? openParenIdx : 0;
+    for (var c = start; c < text.length; c++) {
+      final ch = text[c];
+      if (ch == '(') {
+        depth++;
+        started = true;
+      } else if (ch == ')') {
+        depth--;
+        if (started && depth == 0) {
+          b.write(text.substring(start, c + 1));
+          return b.toString();
+        }
+      }
+    }
+    b.writeln(text.substring(start));
+  }
+  return null;
 }
 
 String _stripComment(String line) {
@@ -210,7 +253,12 @@ String renderLintMarkdown(List<LintFinding> findings) {
   b.writeln('# UI lint');
   b.writeln();
   b.writeln('${findings.length} findings · ${counts['error'] ?? 0} errors · '
-      '${counts['warning'] ?? 0} warnings · ${counts['info'] ?? 0} info.');
+      '${counts['warning'] ?? 0} warnings · ${counts['convention'] ?? 0} convention · ${counts['info'] ?? 0} info.');
+  b.writeln();
+  b.writeln('Errors and warnings are structural defects with a `file:line`. Convention findings '
+      'bypass the theme or project conventions and are defects only when the rendered result is '
+      'wrong (check `low_contrast` and the dark capture). Add `// ui_map: ignore` to a line for a '
+      'motivated exception.');
   b.writeln();
   if (findings.isEmpty) return b.toString();
   final byRule = <String, List<LintFinding>>{};

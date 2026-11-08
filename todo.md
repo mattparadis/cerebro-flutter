@@ -17,7 +17,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 1. Separare osservazioni, sospetti, difetti e limiti della verifica
 
-- [ ] Correggere le istruzioni che dichiarano automaticamente confermati `dead_taps`, warning del lint e problemi dell'ambiente di cattura.
+- [x] Correggere le istruzioni che dichiarano automaticamente confermati `dead_taps`, warning del lint e problemi dell'ambiente di cattura. *(fatto 2026-11-08: stati `confirmed/suspected/not_checked/capture_issue` nella skill e nel template; sezione Capture limits in MAP.md; regola sui target annidati)*
 
 **Problema:** `audit-screens` attribuisce certezza a segnali che possono dipendere da osservazioni incomplete. Anche un errore della factory o una dipendenza non simulata può diventare impropriamente un difetto dell'app.
 
@@ -41,7 +41,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 2. Correggere l'esplorazione delle interazioni e della navigazione
 
-- [ ] Sostituire l'equivalenza «nessuna navigazione/overlay = azione non funzionante».
+- [x] Sostituire l'equivalenza «nessuna navigazione/overlay = azione non funzionante». *(fatto 2026-11-08: `no_observed_effect` + `state_change` via fingerprint della semantica; profondità prima della location in `classifyEdge`. Rimandati: observer multi-Navigator, scenari con risultati attesi)*
 
 **Problema:** filtri, espansioni, selezioni, aggiornamenti locali e pagine di onboarding possono funzionare senza cambiare URL. Profondità dello stack e URL non identificano con certezza l'operazione di navigazione eseguita.
 
@@ -67,7 +67,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 3. Ridurre i falsi positivi del lint
 
-- [ ] Correggere le regole basate sulla vicinanza di righe e chiarire il significato dei warning.
+- [x] Correggere le regole basate sulla vicinanza di righe e chiarire il significato dei warning. *(fatto 2026-11-08: `small-icon-button` sulla lista argomenti bilanciata e `child: IconButton`; severità `convention` per colori e fontSize; `// ui_map: ignore`. Non fatto: AST completo)*
 
 **Problema:** il lint interpreta un `SizedBox(height: 8)` vicino a un `IconButton` come un vincolo del pulsante, anche quando sono fratelli. La presenza di un colore o di un font size letterale non dimostra da sola un difetto visibile.
 
@@ -85,7 +85,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ### 4. Correggere il contratto e la copertura del controllo del contrasto
 
-- [ ] Eliminare l'affermazione «tutto ciò che non compare in low_contrast ha superato il controllo».
+- [x] Eliminare l'affermazione «tutto ciò che non compare in low_contrast ha superato il controllo». *(fatto 2026-11-08: campionamento dello sfondo corretto per testo quasi uguale allo sfondo; `contrast_coverage` e `contrast_not_measurable` con motivo; checklist e material3 aggiornate. Rimandati: span multistile misurati singolarmente, testo editabile, passaggio di rendering dedicato)*
 
 **Problema:** il campionamento può saltare proprio testi molto simili allo sfondo. La scansione dei soli `RichText`, con un solo stile per paragrafo, non copre tutto il testo renderizzato. Stati disabilitati e altre esenzioni non vengono distinti esplicitamente.
 

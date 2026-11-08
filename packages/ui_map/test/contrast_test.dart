@@ -47,6 +47,16 @@ void main() {
     expect(sampleBackground(img, 40, 20, left: 0, top: 0, width: 40, height: 20, foreground: 0xFFFFFF), 0x222222);
   });
 
+  test('near-white text on white is measured, not skipped (review item 4)', () {
+    final img = _image(40, 20, 0xFFFFFF, fg: 0xF0F0F0);
+    final bg = sampleBackground(img, 40, 20, left: 0, top: 0, width: 40, height: 20, foreground: 0xF0F0F0);
+    expect(bg, 0xFFFFFF);
+    expect(contrastRatio(0xF0F0F0, bg!), lessThan(1.3));
+    // Only text pixels: nothing left to call background.
+    final flat = _image(10, 10, 0xF0F0F0);
+    expect(sampleBackground(flat, 10, 10, left: 0, top: 0, width: 10, height: 10, foreground: 0xF0F0F0), isNull);
+  });
+
   test('composites alpha and picks the AA threshold', () {
     expect(compositeOver(0x80000000, 0xFFFFFF), closeTo(0x808080, 0x010101));
     expect(compositeOver(0xFF123456, 0xFFFFFF), 0x123456);

@@ -142,17 +142,21 @@ defaults: seed colour, `ColorScheme.fromSeed`, 16 dp gutter, M3 components.
 3. Add the route (and its `params` / `variants`) to `ui_map.yaml`, run
    `dart run ui_map capture --explore`, and look at every PNG of the new
    screen in light and dark (and `__x1.3` if `text_scales` includes 1.3).
-   Check the new screen's `edges` in `map.json`: every button navigates
-   or opens what the brief says, nothing lands in `dead_taps`, and the
-   back/close action works when the screen is opened directly (no
-   "nothing to pop" error).
+   Check the new screen's `edges` in `map.json`: every control does what
+   the brief says (navigates, opens an overlay, or changes content in
+   place as a `state_change`), nothing of yours is in `no_effect_taps`
+   unless its effect is outside the screen by design, and the back/close
+   action works when the screen is opened directly (no "nothing to pop"
+   error).
 4. Self-audit against the `audit-screens` checklist if that skill is
    installed, otherwise against `anti-patterns.md` and step 3 above.
    Fix anything of severity 3-4 (touch target, contrast, missing state,
    no way back, overflow) before presenting. Report `exceptions` from
    `map.json` as fixed, not as known issues.
 5. `dart run ui_map lint` reports no `error` or `warning` in the new
-   files; `flutter analyze` clean; existing tests still pass.
+   files; `convention` findings in them are either removed or justified
+   with a `// ui_map: ignore <reason>` comment. `flutter analyze` clean;
+   existing tests still pass.
 
 ## 5. Deliver
 
