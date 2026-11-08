@@ -64,6 +64,10 @@ app is small): `map.json` then has `edges` (what every tap does),
 `no_effect_taps`, the count of `state_change` taps and, per edge, `transition`
 (`animated` / `instant` / `continuous` / `unknown`) with `transition_ms`, the
 motion evidence for checklist section I. Use them as evidence:
+Screens also list `tappables_clipped` (cut by a scroll edge or the keyboard;
+not a target finding) and `contrast_not_measurable` entries with reason
+`occluded by ...` (text under a FAB or sticky CTA; report the overlap as a
+layout observation, never as low contrast).
 
 - a `no_effect_taps` entry on a button, tile with a chevron, chip or link
   is a `suspected` "looks interactive, does nothing" finding (severity 3 on

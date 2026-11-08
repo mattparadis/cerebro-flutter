@@ -90,6 +90,14 @@ means page transitions are off; `instant` on the state change behind the
 screen's main action means it ships without feedback motion. The summary
 counts `animated_transitions` and `instant_transitions`.
 
+Two classes keep the numbers honest: a tappable cut by the edge of its
+scroll view or by the keyboard inset is listed under `tappables_clipped`
+(its real size is unknown) instead of `tappables_below_min`, and a text
+whose rect is crossed by a FAB or a sticky button, or whose measured ratio
+is below 1.3:1, goes to `contrast_not_measurable` with reason
+`occluded by "<label>"` rather than to `low_contrast`. Each explored edge
+also has `self_transition`, the motion inside the tapped control itself.
+
 Prototype routes (`/__proto/<name>`, captured with `-D UI_PROTO=true`) are
 also composed into one sheet per screen, `.ui-map/proto/<name>.png` (one
 column per direction, one row per theme), listed in `.ui-map/PROTO.md`.

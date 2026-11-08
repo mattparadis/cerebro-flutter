@@ -320,8 +320,9 @@ class UiMap {
           image.dispose();
         }
       });
+      ContrastReport? report;
       if (rgba != null) {
-        final report = measureTextContrast(tester, rgba!, imageW, imageH, scale: config.exportScale);
+        report = measureTextContrast(tester, rgba!, imageW, imageH, scale: config.exportScale);
         result['text_nodes_checked'] = report.checked;
         result['low_contrast'] = report.low.map((e) => e.toJson()).toList();
         result['low_contrast_icons'] = report.lowIcons.map((e) => e.toJson()).toList();
@@ -349,7 +350,26 @@ class UiMap {
         File(semPath).writeAsStringSync(dump);
         result['semantics'] = p.relative(semPath, from: outDir);
         result['sha256_semantics'] = sha256.convert(utf8.encode(dump)).toString();
-        final tappables = collectTappables(root, dpr: device.dpr, minTapSize: minTap);
+        final visible = Rect.fromLTWH(
+          0,
+          0,
+          device.width,
+          device.height - (target.keyboard ? config.keyboardInset : 0),
+        );
+        final tappables = collectTappables(root, dpr: device.dpr, minTapSize: minTap, visible: visible);
+        if (report != null) {
+          final (kept, occluded) = splitOccluded(report.low, tappables, screenArea: device.width * device.height);
+          if (occluded.isNotEmpty) {
+            result['low_contrast'] = kept.map((e) => e.toJson()).toList();
+            result['contrast_not_measurable'] = [...report.notMeasurable, ...occluded];
+            result['contrast_coverage'] = {
+              ...(result['contrast_coverage'] as Map<String, Object?>),
+              'failed': kept.length,
+              'not_measurable': report.notMeasurable.length + occluded.length,
+              'occluded': occluded.length,
+            };
+          }
+        }
         if (explore) {
           result['edges'] = (await _explore(
             tester,
@@ -367,7 +387,11 @@ class UiMap {
         result['tappables_count'] = tappables.length;
         result['tappables_below_min'] = [
           for (final t in tappables)
-            if ((t.width < minTap || t.height < minTap) && !t.nestedInLargerTarget) t.toJson(),
+            if ((t.width < minTap || t.height < minTap) && !t.nestedInLargerTarget && !t.clipped) t.toJson(),
+        ];
+        result['tappables_clipped'] = [
+          for (final t in tappables)
+            if (t.clipped) t.toJson(),
         ];
         result['tappables_below_min_nested'] = [
           for (final t in tappables)
@@ -464,6 +488,7 @@ class UiMap {
         error = _firstLine(e.toString());
       }
       final motion = busyBefore ? _Motion.unknown : sampler.classify();
+      final selfMotion = busyBefore ? _Motion.unknown : sampler.classifySelf();
       for (var e = tester.takeException(); e != null; e = tester.takeException()) {
         error ??= _firstLine(e.toString());
       }
@@ -505,6 +530,7 @@ class UiMap {
         y: t.top + t.height / 2,
         transition: noEffect ? null : motion.kind,
         transitionMs: motion.ms,
+        selfTransition: noEffect ? null : selfMotion.kind,
       ));
     }
     return edges;
@@ -962,6 +988,7 @@ class Tappable {
     required this.height,
     this.nestedInLargerTarget = false,
     this.fullScreen = false,
+    this.clipped = false,
   });
 
   final String label;
@@ -978,6 +1005,11 @@ class Tappable {
   /// Covers 90%+ of the screen: a tap catcher, skipped by explore.
   final bool fullScreen;
 
+  /// The visible rect is cut by the edge of its scroll view or of the
+  /// viewport (keyboard inset): a chip half scrolled away, a field under the
+  /// keyboard. Its real size is unknown, so it is not a small-target finding.
+  final bool clipped;
+
   Map<String, Object?> toJson() => {
         'label': label,
         'x': _r(left),
@@ -986,6 +1018,7 @@ class Tappable {
         'height': _r(height),
         'nested_in_larger_target': nestedInLargerTarget,
         if (fullScreen) 'full_screen': true,
+        if (clipped) 'clipped': true,
       };
 
   static double _r(double v) => (v * 10).roundToDouble() / 10;
@@ -997,19 +1030,42 @@ List<Tappable> collectTappables(
   SemanticsNode root, {
   required double dpr,
   double minTapSize = 48,
+  Rect? visible,
 }) {
   final out = <Tappable>[];
   final seen = <String>{};
   final screen = root.rect;
   final screenArea = screen.width * screen.height / (dpr * dpr);
-  void walk(SemanticsNode n, Matrix4 parent, Rect? enclosingTarget) {
+  final rootClip = _ClipInfo(
+    hRect: null,
+    vRect: visible ?? Rect.fromLTWH(0, 0, screen.width / dpr, screen.height / dpr),
+  );
+  void walk(SemanticsNode n, Matrix4 parent, Rect? enclosingTarget, _ClipInfo clip) {
     final m = n.transform == null ? parent : (parent.clone()..multiply(n.transform!));
     final data = n.getSemanticsData();
     final hidden = n.flagsCollection.isHidden;
     var enclosing = enclosingTarget;
+    var innerClip = clip;
+    final scrollsH = data.hasAction(SemanticsAction.scrollLeft) || data.hasAction(SemanticsAction.scrollRight);
+    final scrollsV = data.hasAction(SemanticsAction.scrollUp) || data.hasAction(SemanticsAction.scrollDown);
+    if ((scrollsH || scrollsV) && !n.rect.isEmpty) {
+      final sr = MatrixUtils.transformRect(m, n.rect);
+      final srl = Rect.fromLTWH(sr.left / dpr, sr.top / dpr, sr.width / dpr, sr.height / dpr);
+      innerClip = _ClipInfo(
+        hRect: scrollsH ? (clip.hRect == null ? srl : srl.intersect(clip.hRect!)) : clip.hRect,
+        vRect: scrollsV ? (clip.vRect == null ? srl : srl.intersect(clip.vRect!)) : clip.vRect,
+      );
+    }
     if (!hidden && data.hasAction(SemanticsAction.tap) && !n.rect.isEmpty) {
       final r = MatrixUtils.transformRect(m, n.rect);
       final logical = Rect.fromLTWH(r.left / dpr, r.top / dpr, r.width / dpr, r.height / dpr);
+      final h = clip.hRect, v = clip.vRect;
+      final clipped = (h != null &&
+              logical.width < minTapSize &&
+              (logical.left <= h.left + 0.5 || logical.right >= h.right - 0.5)) ||
+          (v != null &&
+              logical.height < minTapSize &&
+              (logical.top <= v.top + 0.5 || logical.bottom >= v.bottom - 0.5));
       final nested = enclosingTarget != null &&
           enclosingTarget.contains(logical.topLeft) &&
           enclosingTarget.contains(logical.bottomRight - const Offset(0.01, 0.01));
@@ -1034,17 +1090,60 @@ List<Tappable> collectTappables(
           height: logical.height,
           nestedInLargerTarget: nested,
           fullScreen: fullScreen,
+          clipped: clipped,
         ));
       }
     }
     n.visitChildren((c) {
-      walk(c, m, enclosing);
+      walk(c, m, enclosing, innerClip);
       return true;
     });
   }
 
-  walk(root, Matrix4.identity(), null);
+  walk(root, Matrix4.identity(), null, rootClip);
   return out;
+}
+
+/// Nearest clipping rects per axis: the innermost horizontal scroll view
+/// (if any) and the innermost vertical scroll view or the viewport.
+class _ClipInfo {
+  const _ClipInfo({required this.hRect, required this.vRect});
+  final Rect? hRect;
+  final Rect? vRect;
+}
+
+/// Splits low-contrast findings into real ones and texts whose sampled
+/// background was another surface painted over them (a FAB or a sticky
+/// button crossing the text rect, or a ratio no designer would ship).
+/// Returns the kept findings and the not-measurable entries.
+(List<LowContrast>, List<Map<String, Object?>>) splitOccluded(
+  List<LowContrast> low,
+  List<Tappable> tappables, {
+  required double screenArea,
+}) {
+  final kept = <LowContrast>[];
+  final occluded = <Map<String, Object?>>[];
+  for (final lc in low) {
+    String? reason;
+    for (final t in tappables) {
+      if (t.fullScreen) continue;
+      final tr = Rect.fromLTWH(t.left, t.top, t.width, t.height);
+      final area = t.width * t.height;
+      if (area <= 0 || area > screenArea * 0.5) continue;
+      if (!tr.overlaps(lc.rect)) continue;
+      final containsText = tr.contains(lc.rect.topLeft) && tr.contains(lc.rect.bottomRight - const Offset(0.01, 0.01));
+      if (containsText) continue;
+      reason = 'occluded by "${t.label}"';
+      break;
+    }
+    if (reason == null && lc.ratio < 1.3) reason = 'implausible ratio: text probably covered by another surface';
+    if (reason == null) {
+      kept.add(lc);
+    } else {
+      occluded.add({...lc.toJson(), 'reason': reason, 'status': 'suspected'});
+    }
+  }
+  return (kept, occluded);
 }
 
 
@@ -1065,6 +1164,7 @@ class _FrameSampler {
   final GlobalKey key;
   final Rect mask;
   final List<bool> _changes = [];
+  final List<bool> _selfChanges = [];
   Uint8List? _last;
   int _width = 0;
   int _height = 0;
@@ -1081,6 +1181,22 @@ class _FrameSampler {
       return data?.buffer.asUint8List();
     });
     return bytes;
+  }
+
+  /// Pixels inside the masked rect changed (the control's own animation).
+  bool _differsInside(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return true;
+    final x0 = mask.left.floor().clamp(0, _width), x1 = mask.right.ceil().clamp(0, _width);
+    final y0 = mask.top.floor().clamp(0, _height), y1 = mask.bottom.ceil().clamp(0, _height);
+    final stride = _width * 4;
+    for (var y = y0; y < y1; y++) {
+      final row = y * stride;
+      for (var x = x0; x < x1; x++) {
+        final i = row + x * 4;
+        if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2]) return true;
+      }
+    }
+    return false;
   }
 
   bool _differs(Uint8List a, Uint8List b) {
@@ -1118,24 +1234,33 @@ class _FrameSampler {
       final f = await _grab();
       if (f == null || _last == null || f.length != _last!.length) {
         _changes.add(false);
+        _selfChanges.add(false);
       } else {
         _changes.add(_differs(_last!, f));
+        _selfChanges.add(_differsInside(_last!, f));
       }
       if (f != null) _last = f;
     }
   }
 
-  _Motion classify() {
-    if (_changes.isEmpty) return _Motion.unknown;
-    final first = _changes.indexOf(true);
+  _Motion classify() => _classify(_changes);
+
+  /// Same classification for the tapped control itself: a switch, chip or
+  /// bookmark that flips with no motion is `instant` here. Ink ripples make
+  /// most Material controls `animated`, so this is only informative.
+  _Motion classifySelf() => _classify(_selfChanges);
+
+  static _Motion _classify(List<bool> changes) {
+    if (changes.isEmpty) return _Motion.unknown;
+    final first = changes.indexOf(true);
     if (first < 0) return const _Motion('instant');
-    final last = _changes.lastIndexOf(true);
-    if (_changes.length >= 2 && _changes[_changes.length - 1] && _changes[_changes.length - 2]) {
+    final last = changes.lastIndexOf(true);
+    if (changes.length >= 2 && changes[changes.length - 1] && changes[changes.length - 2]) {
       return const _Motion('continuous');
     }
     var consecutive = false;
-    for (var i = 1; i < _changes.length; i++) {
-      if (_changes[i] && _changes[i - 1]) consecutive = true;
+    for (var i = 1; i < changes.length; i++) {
+      if (changes[i] && changes[i - 1]) consecutive = true;
     }
     if (!consecutive) return const _Motion('instant');
     return _Motion('animated', (last - first + 1) * 50);

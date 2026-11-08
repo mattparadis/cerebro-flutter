@@ -12,6 +12,7 @@ class NavEdge {
     required this.y,
     this.transition,
     this.transitionMs,
+    this.selfTransition,
   });
 
   final String from;
@@ -44,6 +45,9 @@ class NavEdge {
   /// First-to-last change, in ms, when [transition] is `animated`.
   final int? transitionMs;
 
+  /// Motion inside the tapped rect itself (the control's own feedback).
+  final String? selfTransition;
+
   Map<String, Object?> toJson() => {
         'from': from,
         'label': label,
@@ -55,6 +59,7 @@ class NavEdge {
         'y': y,
         if (transition != null) 'transition': transition,
         if (transitionMs != null) 'transition_ms': transitionMs,
+        if (selfTransition != null) 'self_transition': selfTransition,
       };
 }
 

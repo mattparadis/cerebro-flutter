@@ -72,6 +72,8 @@ class MapWriter {
         'error': screens.where((s) => s['status'] == 'error').length,
         'with_exceptions': screens.where((s) => ((s['exceptions'] as List?) ?? []).isNotEmpty).length,
         'with_small_tappables': screens.where((s) => ((s['tappables_below_min'] as List?) ?? []).isNotEmpty).length,
+        'with_clipped_tappables': screens.where((s) => ((s['tappables_clipped'] as List?) ?? []).isNotEmpty).length,
+        'occluded_texts': screens.fold<int>(0, (n, s) => n + (((s['contrast_coverage'] as Map?)?['occluded'] as int?) ?? 0)),
         'with_low_contrast': screens.where((s) => ((s['low_contrast'] as List?) ?? []).isNotEmpty).length,
         'explored_taps': edges.length,
         'no_effect_taps': noEffect.length,
