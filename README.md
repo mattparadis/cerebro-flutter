@@ -18,6 +18,30 @@ packages/ui_map/          Dart package: `dart run ui_map init | routes | capture
 example/demo_app/         Flutter app with planted design defects, used as fixture
 ```
 
+## Prerequisites
+
+- **Flutter SDK ≥ 3.44** on the `PATH` (`flutter doctor` passes for at
+  least one desktop target; no emulator or device is needed). Install from
+  <https://docs.flutter.dev/get-started/install>.
+- An app that uses **`go_router` ≥ 18** or plain `MaterialApp.routes`.
+- **Claude Code** or **Codex CLI** to run the skills.
+- **Node.js** only if you install the skills with `npx skills add`; see the
+  manual copy below if you prefer not to.
+
+## Quick start (5 minutes)
+
+```bash
+git clone git@github.com:mattparadis/flutter-ui-ux-design-skill.git
+cd flutter-ui-ux-design-skill/example/demo_app
+flutter pub get
+dart run ui_map capture          # writes .ui-map/ with 48 screenshots in ~30 s
+claude                           # or: codex
+```
+
+then ask: *audit the screens of this app*. The demo app ships the skills
+under `.claude/skills` and `.agents/skills`, so nothing else is needed.
+To use it on your own app, see [Install in your own app](#install-in-your-own-app).
+
 | Skill | Ask for | What it does |
 |---|---|---|
 | `audit-screens` | "audit / review / critique the screens of this app" | captures (or reuses) the map, reads every PNG and semantics dump, applies the checklist and Nielsen's heuristics, writes `.ui-map/audit/<screen>.md` + `SUMMARY.md` with the highest-leverage change |
@@ -68,6 +92,7 @@ test-only wiring needed.
 
 ```bash
 cd example/demo_app
+flutter pub get
 dart run ui_map routes                     # 12 locations, incl. /notes?state=empty|loading|error
 dart run ui_map capture                    # 48 PNGs (12 locations × light/dark × 1.0/1.3 text) in ~30 s
 dart run ui_map capture -D UI_PROTO=true   # + the two prototype directions under /__proto/note-detail
@@ -129,15 +154,72 @@ onboarding content without `SafeArea`.
 
 ## Install in your own app
 
+Three pieces: the skills (Markdown folders the agent reads), the `ui_map`
+tool (a Dart dev dependency), and the factory file that tells `ui_map`
+how to build your app. Run everything from your app's root (where
+`pubspec.yaml` is).
+
+### 1. The skills
+
+With Node.js, from your app's root:
+
 ```bash
-# the skills (Claude Code → .claude/skills, Codex → .agents/skills)
+# Claude Code → .claude/skills/<name>, Codex → .agents/skills/<name>
 npx skills add mattparadis/flutter-ui-ux-design-skill --skill audit-screens
 npx skills add mattparadis/flutter-ui-ux-design-skill --skill design-screen
-
-# the tool, as a dev dependency (SSH form while the repo is private)
-dart pub add 'dev:ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux-design-skill.git","path":"packages/ui_map"}}'
-dart run ui_map init
 ```
+
+The CLI asks which agents to install for and remembers the answer: tick
+both Claude Code and Codex, or pass `-a claude-code,codex` (or `-a '*'`).
+Add `-g` to install for every project instead of the current one.
+
+Or by hand: copy (or symlink) `skills/audit-screens` and
+`skills/design-screen` from a clone of this repo into `.claude/skills/`
+(Claude Code) and/or `.agents/skills/` (Codex) inside your app. Each
+skill is self-contained: `SKILL.md` plus its `references/` folder.
+
+```bash
+git clone git@github.com:mattparadis/flutter-ui-ux-design-skill.git ~/flutter-ui-ux-design-skill
+mkdir -p .claude/skills .agents/skills
+for s in audit-screens design-screen; do
+  ln -s ~/flutter-ui-ux-design-skill/skills/$s .claude/skills/$s
+  ln -s ~/flutter-ui-ux-design-skill/skills/$s .agents/skills/$s
+done
+```
+
+To make a skill available in every project instead of one, put it under
+`~/.claude/skills/` (Claude Code) or `~/.agents/skills/` (Codex).
+Restart the agent after installing; verify with `/skills` in Claude Code.
+
+### 2. The tool
+
+```bash
+# as a dev dependency (SSH form while the repo is private; needs a GitHub
+# account with access to the repo and an SSH key)
+dart pub add 'dev:ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux-design-skill.git","path":"packages/ui_map"}}'
+# or, from a local clone:
+dart pub add 'dev:ui_map:{"path":"../flutter-ui-ux-design-skill/packages/ui_map"}'
+```
+
+### 3. The factory
+
+```bash
+dart run ui_map init           # writes ui_map.yaml + test/ui_map/app_factory.dart
+dart run ui_map routes         # lists the locations it will capture; add params in ui_map.yaml
+dart run ui_map capture        # .ui-map/map.json, MAP.md, screens/, semantics/
+```
+
+`init` leaves two `UnimplementedError` stubs in `app_factory.dart`:
+`buildRouter({required String initialLocation})` returns your `GoRouter`
+with that initial location, and `buildApp(GoRouter router, {required
+ThemeMode themeMode})` returns your root `MaterialApp.router` using that
+router and theme mode. Usually both are one-line calls into functions you
+already have in `lib/`. The audit skill fills them in itself when it can
+find those functions; you only have to do it by hand when the router is
+built behind dependency injection the test cannot call.
+
+Add `.ui-map/` to `.gitignore` unless you want the screenshots in the
+repo (keep `.ui-map/baseline/` if you use `ui_map check`, see below).
 
 **Navigator 1.0 apps** (`MaterialApp` with `routes:` and `Navigator.pushNamed`,
 no go_router): run `dart run ui_map init --navigator`. The factory then
@@ -174,10 +256,9 @@ lives in `test/ui_map/app_factory.dart` and `ui_map.yaml`, nothing in
   initial route; `map.json` records `redirected_to` and the audit skill
   reports the redirect once instead of auditing the login screen 20 times.
 
-Requirements: Flutter ≥ 3.44; `go_router` ≥ 18 or `MaterialApp.routes`. Routes with `:params` need
-sample values in `ui_map.yaml`; screens that hit the network or platform
-channels at build time will render their error/empty branch (no HTTP in
-`flutter test`).
+Routes with `:params` need sample values in `ui_map.yaml`; screens that
+hit the network or platform channels at build time will render their
+error/empty branch (no HTTP in `flutter test`).
 
 ## Keep screenshots up to date: baseline, diff, check
 

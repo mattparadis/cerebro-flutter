@@ -1,6 +1,6 @@
 ---
 name: audit-screens
-description: Audit the UI/UX of a Flutter app from rendered screenshots and the semantics tree, not just source code. Use when asked to audit, review, critique or check the screens, UI, UX, design, accessibility, touch targets or dark mode of a Flutter app, or "what's wrong with these screens". Captures every go_router route headlessly with ui_map, then evaluates each screen against a Flutter-specific checklist and writes per-screen reports plus a summary.
+description: Audit the UI/UX of a Flutter app from rendered screenshots and the semantics tree, not just source code. Use when asked to audit, review, critique or check the screens, UI, UX, design, accessibility, touch targets or dark mode of a Flutter app, or "what's wrong with these screens". Captures every go_router or Navigator 1.0 route headlessly with ui_map, then evaluates each screen against a Flutter-specific checklist and writes per-screen reports plus a summary.
 ---
 
 # Audit screens
@@ -12,17 +12,21 @@ secondary; the screenshots are the primary evidence.
 
 ## 0. Preconditions
 
-The app must use `go_router`. The capture tool is the `ui_map` package in this
-repository (`packages/ui_map`).
+The app must use `go_router`, or Navigator 1.0 (`MaterialApp` with
+`routes:` and `Navigator.pushNamed`). The capture tool is the `ui_map`
+package from this repository (`packages/ui_map`).
 
 1. Check `pubspec.yaml` for a `ui_map` dev dependency. If missing, add one
-   (path or git) and run `flutter pub get`.
-2. If `test/ui_map/app_factory.dart` does not exist, run `dart run ui_map init`.
+   (path or git, see the repository README) and run `flutter pub get`.
+2. If `test/ui_map/app_factory.dart` does not exist, run `dart run ui_map init`
+   (go_router) or `dart run ui_map init --navigator` (Navigator 1.0).
 3. If `app_factory.dart` still contains `UnimplementedError(`, fill it in
-   yourself: find the function that builds the `GoRouter` and the root
-   `MaterialApp.router` widget in `lib/`, and wire them so `buildRouter`
-   honours `initialLocation` and `buildApp` honours `themeMode`. Only ask the
-   developer when the router is built behind DI you cannot call from a test.
+   yourself. go_router: find the function that builds the `GoRouter` and the
+   root `MaterialApp.router` widget in `lib/`, and wire them so `buildRouter`
+   honours `initialLocation` and `buildApp` honours `themeMode`. Navigator
+   1.0: return the root `MaterialApp` and, if screens read route arguments,
+   implement `argumentsFor(location)`. Only ask the developer when the
+   router is built behind DI you cannot call from a test.
 4. Run `dart run ui_map routes`. For every `SKIP ... missing params` line, add
    sample values under `routes:` in `ui_map.yaml`. For list screens, add
    `variants` for empty / loading / error states if the app exposes them via
