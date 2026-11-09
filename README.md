@@ -1,5 +1,8 @@
 # Cerebro: Flutter UI/UX agent skills + headless screen capture
 
+[![pub package](https://img.shields.io/pub/v/cerebro.svg)](https://pub.dev/packages/cerebro)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Two agent skills for **Claude Code** and **Codex CLI** that design and
 audit Flutter mobile UI from what the user actually sees, and `cerebro`,
 the Dart tool they lean on: one headless screenshot per route (no emulator),
@@ -110,7 +113,9 @@ Restart the agent after installing; verify with `/skills` in Claude Code.
 ### 2. The tool
 
 ```bash
-# as a dev dependency, straight from GitHub
+# as a dev dependency, from pub.dev
+dart pub add dev:cerebro
+# or straight from GitHub (latest main):
 dart pub add 'dev:cerebro:{"git":{"url":"https://github.com/mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
 # or, from a local clone:
 dart pub add 'dev:cerebro:{"path":"../cerebro-flutter/packages/cerebro"}'

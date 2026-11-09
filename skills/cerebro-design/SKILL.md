@@ -43,8 +43,9 @@ The capture loop below needs the `cerebro` dev dependency. Check
 `pubspec.yaml` first; if it is missing, add it and scaffold it:
 
 ```sh
-# from the repo that ships this skill (adjust the URL or use a local path)
-dart pub add 'dev:cerebro:{"git":{"url":"git@github.com:mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
+dart pub add dev:cerebro     # from pub.dev
+# or the latest main from GitHub:
+dart pub add 'dev:cerebro:{"git":{"url":"https://github.com/mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
 # or, with a checkout next to the project:
 dart pub add 'dev:cerebro:{"path":"../cerebro-flutter/packages/cerebro"}'
 dart run cerebro init            # cerebro.yaml + test/cerebro/app_factory.dart
