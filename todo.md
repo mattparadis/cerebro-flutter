@@ -1,4 +1,4 @@
-# TODO — Review delle skill Flutter UI/UX e di ui_map
+# TODO — Review delle skill Flutter UI/UX e di cerebro
 
 Obiettivo: guidare la creazione di applicazioni Flutter curate nel design e corrette nei comportamenti UI/UX, con verifiche che distinguano ciò che è dimostrato da ciò che resta da controllare.
 
@@ -6,7 +6,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 ## Evidenze della review
 
-- I 23 test esistenti di `packages/ui_map` passano.
+- I 23 test esistenti di `packages/cerebro` passano.
 - Una nuova cattura della demo con esplorazione ha completato 48 screenshot senza errori di cattura.
 - Il pulsante `Next` dell'onboarding cambia pagina tramite `PageController.nextPage`, ma l'esplorazione lo classifica come `none`.
 - Una verifica mirata conferma che `sampleBackground` può restituire `null` per testo `#F0F0F0` su bianco, nonostante un contrasto inferiore a 1,2:1.
@@ -19,7 +19,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 - [x] Correggere le istruzioni che dichiarano automaticamente confermati `dead_taps`, warning del lint e problemi dell'ambiente di cattura. *(fatto 2026-11-08: stati `confirmed/suspected/not_checked/capture_issue` nella skill e nel template; sezione Capture limits in MAP.md; regola sui target annidati)*
 
-**Problema:** `audit-screens` attribuisce certezza a segnali che possono dipendere da osservazioni incomplete. Anche un errore della factory o una dipendenza non simulata può diventare impropriamente un difetto dell'app.
+**Problema:** `cerebro-audit` attribuisce certezza a segnali che possono dipendere da osservazioni incomplete. Anche un errore della factory o una dipendenza non simulata può diventare impropriamente un difetto dell'app.
 
 **Come risolvere:**
 
@@ -37,7 +37,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 - Ogni finding confermato include un'evidenza riproducibile.
 - Report e riepilogo distinguono difetti, sospetti e copertura mancante.
 
-**File:** `skills/audit-screens/SKILL.md`, `skills/audit-screens/references/report-template.md`, `packages/ui_map/lib/src/map_writer.dart`.
+**File:** `skills/cerebro-audit/SKILL.md`, `skills/cerebro-audit/references/report-template.md`, `packages/cerebro/lib/src/map_writer.dart`.
 
 ### 2. Correggere l'esplorazione delle interazioni e della navigazione
 
@@ -63,11 +63,11 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 - Un callback realmente vuoto resta rilevabile, con evidenza appropriata.
 - La skill di build non richiede più che ogni pulsante navighi o apra un overlay.
 
-**File:** `packages/ui_map/lib/src/edges.dart`, `packages/ui_map/lib/src/driver.dart`, `packages/ui_map/lib/src/capture.dart`, entrambe le skill.
+**File:** `packages/cerebro/lib/src/edges.dart`, `packages/cerebro/lib/src/driver.dart`, `packages/cerebro/lib/src/capture.dart`, entrambe le skill.
 
 ### 3. Ridurre i falsi positivi del lint
 
-- [x] Correggere le regole basate sulla vicinanza di righe e chiarire il significato dei warning. *(fatto 2026-11-08: `small-icon-button` sulla lista argomenti bilanciata e `child: IconButton`; severità `convention` per colori e fontSize; `// ui_map: ignore`. Non fatto: AST completo)*
+- [x] Correggere le regole basate sulla vicinanza di righe e chiarire il significato dei warning. *(fatto 2026-11-08: `small-icon-button` sulla lista argomenti bilanciata e `child: IconButton`; severità `convention` per colori e fontSize; `// cerebro: ignore`. Non fatto: AST completo)*
 
 **Problema:** il lint interpreta un `SizedBox(height: 8)` vicino a un `IconButton` come un vincolo del pulsante, anche quando sono fratelli. La presenza di un colore o di un font size letterale non dimostra da sola un difetto visibile.
 
@@ -81,7 +81,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 **Criteri di completamento:** il caso di widget fratelli non genera più il warning; un pulsante realmente vincolato a 32×32 viene ancora segnalato; commenti e stringhe non generano falsi finding strutturali.
 
-**File:** `packages/ui_map/lib/src/lint.dart`, `packages/ui_map/test/lint_test.dart`, entrambe le skill.
+**File:** `packages/cerebro/lib/src/lint.dart`, `packages/cerebro/test/lint_test.dart`, entrambe le skill.
 
 ### 4. Correggere il contratto e la copertura del controllo del contrasto
 
@@ -106,7 +106,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 - Fixture coprono testo multistile, testo editabile, opacità, sfondi variabili e controlli disabilitati.
 - Report e checklist distinguono esplicitamente misura riuscita e copertura mancante.
 
-**File:** `packages/ui_map/lib/src/contrast.dart`, `packages/ui_map/lib/src/capture.dart`, `skills/audit-screens/references/checklist.md`, `skills/design-screen/references/material3.md`.
+**File:** `packages/cerebro/lib/src/contrast.dart`, `packages/cerebro/lib/src/capture.dart`, `skills/cerebro-audit/references/checklist.md`, `skills/cerebro-design/references/material3.md`.
 
 **Riferimento:** [W3C — Contrast Minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
 
@@ -130,7 +130,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 **Criteri di completamento:** almeno un flusso di creazione dimostra salvataggio, errore/retry, annullamento e protezione dal doppio invio; almeno un flusso autenticato conserva la destinazione originaria.
 
-**File:** `skills/design-screen/SKILL.md`, `skills/design-screen/references/patterns.md`, `skills/audit-screens/references/checklist.md`, fixture della demo.
+**File:** `skills/cerebro-design/SKILL.md`, `skills/cerebro-design/references/patterns.md`, `skills/cerebro-audit/references/checklist.md`, fixture della demo.
 
 ### 6. Rendere riproducibili gli scenari tramite fixture
 
@@ -167,11 +167,11 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 **Criteri di completamento:** ogni direzione proposta ha una motivazione legata agli utenti e ai contenuti; i prototipi differiscono per scelte utili al compito; le eccezioni estetiche sono ammesse quando motivate.
 
-**File:** `skills/design-screen/SKILL.md`, `skills/design-screen/references/anti-patterns.md`, `skills/design-screen/references/material3.md`.
+**File:** `skills/cerebro-design/SKILL.md`, `skills/cerebro-design/references/anti-patterns.md`, `skills/cerebro-design/references/material3.md`.
 
 ### 8. Distinguere requisiti, default ed eccezioni
 
-- [x] Rivedere gli assoluti e risolvere le contraddizioni tra reference e checklist. *(fatto 2026-11-08: legenda requisito/default/contesto in design-screen e nelle reference; strategia adattiva Material+`.adaptive` ammessa; politica di validazione dei form; `go` su route figlia vs top-level giudicato dal pop osservato; `min_tap_size` per piattaforma nel tool)*
+- [x] Rivedere gli assoluti e risolvere le contraddizioni tra reference e checklist. *(fatto 2026-11-08: legenda requisito/default/contesto in cerebro-design e nelle reference; strategia adattiva Material+`.adaptive` ammessa; politica di validazione dei form; `go` su route figlia vs top-level giudicato dal pop osservato; `min_tap_size` per piattaforma nel tool)*
 
 **Come risolvere:**
 
@@ -210,7 +210,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 **Criteri di completamento:** i report mostrano una copertura esplicita; la skill non dichiara verificata una piattaforma o una condizione mai eseguita; i controlli manuali hanno passi e risultati attesi.
 
-**File:** `packages/ui_map/lib/src/config.dart`, `packages/ui_map/lib/src/templates.dart`, `packages/ui_map/lib/src/capture.dart`, entrambe le skill.
+**File:** `packages/cerebro/lib/src/config.dart`, `packages/cerebro/lib/src/templates.dart`, `packages/cerebro/lib/src/capture.dart`, entrambe le skill.
 
 **Riferimento:** [Flutter Accessibility](https://docs.flutter.dev/ui/accessibility).
 
@@ -231,7 +231,7 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 **Criteri di completamento:** una fixture con un vecchio difetto risolto e uno nuovo a conteggio invariato segnala il nuovo problema; il peggioramento del contrasto viene riconosciuto; una perdita di copertura non appare come successo silenzioso.
 
-**File:** `packages/ui_map/lib/src/diff.dart`, `packages/ui_map/bin/ui_map.dart`, `packages/ui_map/test/diff_test.dart`, `README.md`.
+**File:** `packages/cerebro/lib/src/diff.dart`, `packages/cerebro/bin/cerebro.dart`, `packages/cerebro/test/diff_test.dart`, `README.md`.
 
 ## Ordine di implementazione proposto
 
@@ -254,26 +254,26 @@ Questo documento raccoglie i problemi della review, le soluzioni proposte e i cr
 
 Vedi `experiments/rigattiere-results.md`.
 
-- [ ] La skill design-screen non dice come installare ui_map in un progetto nuovo (dipendenza path/git, `init`, factory): l'agent B si e' costruito un harness suo con Roboto al posto delle font vere. Aggiungere un passo "setup ui_map" esplicito con i comandi, e fallback dichiarato se il pacchetto non e' raggiungibile.
+- [ ] La skill cerebro-design non dice come installare cerebro in un progetto nuovo (dipendenza path/git, `init`, factory): l'agent B si e' costruito un harness suo con Roboto al posto delle font vere. Aggiungere un passo "setup cerebro" esplicito con i comandi, e fallback dichiarato se il pacchetto non e' raggiungibile.
 - [ ] Le skill dovrebbero chiedere di bundlare i font (asset) invece di google_fonts a runtime quando la tipografia e' parte del brief: B ha verificato la tipografia con la font sbagliata.
-- [x] ui_map: un tappable tagliato dal bordo del viewport (chip sotto la tastiera, campo in fondo) viene segnalato come "piccolo". Marcare `clipped: true` e non contarlo in `tappables_below_min`.
-- [x] ui_map: testo coperto da FAB/CTA sticky viene misurato contro il colore del bottone (ratio ~1.0). Rilevare l'occlusione (il rect del testo interseca un tappable sovrastante) e classificare `occluded` invece di `low_contrast`; segnalare a parte "contenuto sotto FAB senza padding".
-- [ ] ui_map explore: un `error` edge salva solo la prima riga dell'eccezione. Salvare anche i primi frame dello stack in `results/<id>.json` (qui e' servito un test manuale per capire che era `ScrollController.jumpTo` su Browse offstage).
+- [x] cerebro: un tappable tagliato dal bordo del viewport (chip sotto la tastiera, campo in fondo) viene segnalato come "piccolo". Marcare `clipped: true` e non contarlo in `tappables_below_min`.
+- [x] cerebro: testo coperto da FAB/CTA sticky viene misurato contro il colore del bottone (ratio ~1.0). Rilevare l'occlusione (il rect del testo interseca un tappable sovrastante) e classificare `occluded` invece di `low_contrast`; segnalare a parte "contenuto sotto FAB senza padding".
+- [ ] cerebro explore: un `error` edge salva solo la prima riga dell'eccezione. Salvare anche i primi frame dello stack in `results/<id>.json` (qui e' servito un test manuale per capire che era `ScrollController.jumpTo` su Browse offstage).
 - [ ] Il bug `jumpTo` su schermata offstage (notifier ascoltato da Browse mentre e' sotto un'altra route) e' uscito identico in A e B: aggiungere un anti-pattern "non toccare ScrollController/FocusNode da listener quando la route non e' corrente" in anti-patterns.md e una regola lint euristica (`jumpTo`/`animateTo` dentro un listener senza `hasClients`/`ModalRoute.isCurrent`).
-- [x] ui_map: `params` accetta una lista di valori (una cattura per valore).
-- [x] ui_map: `drain_timers_ms` pompa il tempo finto a fine cattura cosi' i timer one-shot (snackbar, backend finto) non fanno fallire il test.
-- [x] ui_map: le varianti di `/` avevano id senza prefisso (`__state-empty`); ora `root__state-empty`.
-- [ ] ui_map: `fonts:` non accetta asset key di pacchetto (`packages/<pkg>/fonts/x.ttf`); risolverli via `.dart_tool/package_config.json` → `<pkg>/lib/<path>` (segnalato dall'agent B2).
-- [ ] ui_map: con `--config` fuori dal progetto, `out_dir` relativo viene risolto rispetto alla cartella del config invece che alla root del progetto.
-- [ ] ui_map: un Radio/Checkbox senza label accanto a una riga di testo risulta "unlabeled 40×40" + riga 21 dp: suggerire nel report "unire in un solo target con label" (RadioListTile) invece di due finding separati.
+- [x] cerebro: `params` accetta una lista di valori (una cattura per valore).
+- [x] cerebro: `drain_timers_ms` pompa il tempo finto a fine cattura cosi' i timer one-shot (snackbar, backend finto) non fanno fallire il test.
+- [x] cerebro: le varianti di `/` avevano id senza prefisso (`__state-empty`); ora `root__state-empty`.
+- [ ] cerebro: `fonts:` non accetta asset key di pacchetto (`packages/<pkg>/fonts/x.ttf`); risolverli via `.dart_tool/package_config.json` → `<pkg>/lib/<path>` (segnalato dall'agent B2).
+- [ ] cerebro: con `--config` fuori dal progetto, `out_dir` relativo viene risolto rispetto alla cartella del config invece che alla root del progetto.
+- [ ] cerebro: un Radio/Checkbox senza label accanto a una riga di testo risulta "unlabeled 40×40" + riga 21 dp: suggerire nel report "unire in un solo target con label" (RadioListTile) invece di due finding separati.
 - [x] Skill trigger: B2 ha usato la skill solo con la riga esplicita (B3n: scatta da sola) nel prompt; da testare un run senza quella riga con la nuova descrizione.
 
 ## Da B3 (2026-11-08)
 
-- [x] ui_map: il flag `clipped` per i tappable tagliati dal bordo del viewport e' ora la fonte principale di falsi positivi in tutti e quattro i run (chip sotto la tastiera, campi in fondo): priorita' alta.
-- [x] ui_map: l'animazione interna al controllo toccato (`self_transition`) (switch, chip, bookmark) e' mascherata, quindi risulta `instant`. Aggiungere una seconda misura "self" sul solo rect toccato, cosi' un toggle senza animazione si distingue da uno animato.
-- [ ] Lint: `GoRoute(builder:)` senza `pageBuilder` e senza `PageTransitionsTheme` esplicito → info "verifica le transizioni (ui_map transition)"; in A, B e B2 go_router ha costruito `NoTransitionPage` e nessun agent se n'e' accorto.
+- [x] cerebro: il flag `clipped` per i tappable tagliati dal bordo del viewport e' ora la fonte principale di falsi positivi in tutti e quattro i run (chip sotto la tastiera, campi in fondo): priorita' alta.
+- [x] cerebro: l'animazione interna al controllo toccato (`self_transition`) (switch, chip, bookmark) e' mascherata, quindi risulta `instant`. Aggiungere una seconda misura "self" sul solo rect toccato, cosi' un toggle senza animazione si distingue da uno animato.
+- [ ] Lint: `GoRoute(builder:)` senza `pageBuilder` e senza `PageTransitionsTheme` esplicito → info "verifica le transizioni (cerebro transition)"; in A, B e B2 go_router ha costruito `NoTransitionPage` e nessun agent se n'e' accorto.
 - [x] Skill: B3 ha prototipato solo Browse (B3b e B3n: tre schermate); la skill ora dice "tre schermate: lista, dettaglio, azione principale". Verificare al prossimo run.
 - [x] Esperimento: una sola esecuzione per braccio (B3, B3b, B3n: struttura stabile, tipografia variabile); per un confronto serio servono 2-3 run per configurazione o almeno un secondo B3.
-- [ ] ui_map occlusione: un testo sotto una barra fissa NON tappabile (Container opaco) non viene riconosciuto (B3n ne ha contati 14 a mano). Idea: campionare il colore del rect del testo in due frame con scroll diverso, o confrontare il colore dominante con quello delle superfici note del tema.
-- [ ] Esperimento: ripetere il braccio "senza skill" con rete abilitata (A2), per separare l'effetto delle font da quello delle skill.
+- [ ] cerebro occlusione: un testo sotto una barra fissa NON tappabile (Container opaco) non viene riconosciuto (B3n ne ha contati 14 a mano). Idea: campionare il colore del rect del testo in due frame con scroll diverso, o confrontare il colore dominante con quello delle superfici note del tema.
+- [x] Esperimento: ripetere il braccio "senza skill" con rete abilitata (A2: font uguali ai B3, transizioni 9/37, nessun prototipo).

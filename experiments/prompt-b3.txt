@@ -120,7 +120,7 @@ ellipsis).
 
 ### Tooling
 Skills for Flutter UI design and audit are installed in this project
-(`.claude/skills`): use them. The `ui_map` dev dependency they rely on is
+(`.claude/skills`): use them. The `cerebro` dev dependency they rely on is
 already in `pubspec.yaml`.
 Network access is available in this run (curl), so the fonts named in
 the aesthetic direction can be downloaded and bundled as assets.

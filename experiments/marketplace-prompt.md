@@ -1,8 +1,8 @@
 # A/B experiment: second-hand marketplace app
 
-Same prompt for both runs. Run A: empty folder, no skills, no `ui_map`.
-Run B: empty folder with `.claude/skills` (audit-screens, design-screen)
-and `ui_map` reachable as a dev dependency. Same model, same mode
+Same prompt for both runs. Run A: empty folder, no skills, no `cerebro`.
+Run B: empty folder with `.claude/skills` (cerebro-audit, cerebro-design)
+and `cerebro` reachable as a dev dependency. Same model, same mode
 (both headless or both interactive), no hints about skills in the prompt.
 
 ---
@@ -141,13 +141,13 @@ claude   # paste the prompt
 # Run B
 mkdir rigattiere-b && cd rigattiere-b && flutter create --empty . --project-name rigattiere
 mkdir -p .claude .agents
-ln -s ~/code/flutter-ui-ux-design-skill/skills .claude/skills
-ln -s ~/code/flutter-ui-ux-design-skill/skills .agents/skills
+ln -s ~/code/cerebro-flutter/skills .claude/skills
+ln -s ~/code/cerebro-flutter/skills .agents/skills
 claude   # paste the same prompt; do not mention the skills
 ```
 
-Afterwards, on both: `dart pub add 'dev:ui_map:{"path":"~/code/flutter-ui-ux-design-skill/packages/ui_map"}'`,
-`dart run ui_map init`, fill the factory, `dart run ui_map capture --explore`
+Afterwards, on both: `dart pub add 'dev:cerebro:{"path":"~/code/cerebro-flutter/packages/cerebro"}'`,
+`dart run cerebro init`, fill the factory, `dart run cerebro capture --explore`
 with `text_scales: [1.0, 1.3]`, `keyboard: true` on `/sell` and `/chat/:id`,
 then compare `map.json` summaries (low contrast, small targets, exceptions,
 states reached, no-effect taps) and run both test suites. For the

@@ -18,6 +18,158 @@ Works with `go_router` and plain `MaterialApp.routes`, on any host with the
 Flutter SDK. Status: v0.1, Apache-2.0. The tool was called `ui_map` until
 November 2026; `// ui_map: ignore` comments are still honoured.
 
+## Contents
+
+- [Prerequisites](#prerequisites)
+- [Quick start (5 minutes)](#quick-start-5-minutes)
+- [Install in your own app](#install-in-your-own-app): [the skills](#1-the-skills), [the tool](#2-the-tool), [the factory](#3-the-factory), [real apps: plugins, network, fonts](#real-apps-plugins-network-fonts)
+- [Does it change the result? A benchmark](#does-it-change-the-result-a-benchmark)
+- [How it works](#how-it-works)
+- [Try it on the demo app](#try-it-on-the-demo-app)
+- [Coverage: quick and extended profiles](#coverage-quick-and-extended-profiles)
+- [Keep screenshots up to date: baseline, diff, check](#keep-screenshots-up-to-date-baseline-diff-check)
+- [Deterministic code rules: `cerebro lint`](#deterministic-code-rules-cerebro-lint)
+- [`cerebro.yaml`](#cerebroyaml)
+- [Roadmap](#roadmap) · [Licence](#licence)
+
+## Prerequisites
+
+- **Flutter SDK ≥ 3.44** on the `PATH` (`flutter doctor` passes for at
+  least one desktop target; no emulator or device is needed). Install from
+  <https://docs.flutter.dev/get-started/install>.
+- An app that uses **`go_router` ≥ 18** or plain `MaterialApp.routes`.
+- **Claude Code** or **Codex CLI** to run the skills.
+- **Node.js** only if you install the skills with `npx skills add`; see the
+  manual copy below if you prefer not to.
+
+## Quick start (5 minutes)
+
+```bash
+git clone git@github.com:mattparadis/cerebro-flutter.git
+cd cerebro-flutter/example/demo_app
+flutter pub get
+dart run cerebro capture          # writes .cerebro/ with 48 screenshots in ~30 s
+claude                           # or: codex
+```
+
+then ask: *audit the screens of this app*. The demo app ships the skills
+under `.claude/skills` and `.agents/skills`, so nothing else is needed.
+To use it on your own app, see [Install in your own app](#install-in-your-own-app).
+
+| Skill | Ask for | What it does |
+|---|---|---|
+| `cerebro-audit` | "audit / review / critique the screens of this app" | captures (or reuses) the map, reads every PNG and semantics dump, applies the checklist and Nielsen's heuristics, writes `.cerebro/audit/<screen>.md` + `SUMMARY.md` with the highest-leverage change |
+| `cerebro-design` | "design / prototype / redesign the X screen" | writes a 5-line brief, inherits the app's conventions from the map and theme, then either renders 2-3 prototype directions behind a `UI_PROTO` flag for you to pick, or builds the real screen with all states, captures it and self-audits before presenting |
+
+## Install in your own app
+
+Three pieces: the skills (Markdown folders the agent reads), the `cerebro`
+tool (a Dart dev dependency), and the factory file that tells `cerebro`
+how to build your app. Run everything from your app's root (where
+`pubspec.yaml` is).
+
+### 1. The skills
+
+With Node.js, from your app's root:
+
+```bash
+# Claude Code → .claude/skills/<name>, Codex → .agents/skills/<name>
+npx skills add mattparadis/cerebro-flutter --skill cerebro-audit
+npx skills add mattparadis/cerebro-flutter --skill cerebro-design
+```
+
+The CLI asks which agents to install for and remembers the answer: tick
+both Claude Code and Codex, or pass `-a claude-code,codex` (or `-a '*'`).
+Add `-g` to install for every project instead of the current one.
+
+Or by hand: copy (or symlink) `skills/cerebro-audit` and
+`skills/cerebro-design` from a clone of this repo into `.claude/skills/`
+(Claude Code) and/or `.agents/skills/` (Codex) inside your app. Each
+skill is self-contained: `SKILL.md` plus its `references/` folder.
+
+```bash
+git clone git@github.com:mattparadis/cerebro-flutter.git ~/cerebro-flutter
+mkdir -p .claude/skills .agents/skills
+for s in cerebro-audit cerebro-design; do
+  ln -s ~/cerebro-flutter/skills/$s .claude/skills/$s
+  ln -s ~/cerebro-flutter/skills/$s .agents/skills/$s
+done
+```
+
+To make a skill available in every project instead of one, put it under
+`~/.claude/skills/` (Claude Code) or `~/.agents/skills/` (Codex).
+Restart the agent after installing; verify with `/skills` in Claude Code.
+
+### 2. The tool
+
+```bash
+# as a dev dependency (SSH form while the repo is private; needs a GitHub
+# account with access to the repo and an SSH key)
+dart pub add 'dev:cerebro:{"git":{"url":"git@github.com:mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
+# or, from a local clone:
+dart pub add 'dev:cerebro:{"path":"../cerebro-flutter/packages/cerebro"}'
+```
+
+### 3. The factory
+
+```bash
+dart run cerebro init           # writes cerebro.yaml + test/cerebro/app_factory.dart
+dart run cerebro routes         # lists the locations it will capture; add params in cerebro.yaml
+dart run cerebro capture        # .cerebro/map.json, MAP.md, screens/, semantics/
+```
+
+`init` leaves two `UnimplementedError` stubs in `app_factory.dart`:
+`buildRouter({required String initialLocation})` returns your `GoRouter`
+with that initial location, and `buildApp(GoRouter router, {required
+ThemeMode themeMode})` returns your root `MaterialApp.router` using that
+router and theme mode. Usually both are one-line calls into functions you
+already have in `lib/`. The audit skill fills them in itself when it can
+find those functions; you only have to do it by hand when the router is
+built behind dependency injection the test cannot call.
+
+Add `.cerebro/` to `.gitignore` unless you want the screenshots in the
+repo (keep `.cerebro/baseline/` if you use `cerebro check`, see below).
+
+**Navigator 1.0 apps** (`MaterialApp` with `routes:` and `Navigator.pushNamed`,
+no go_router): run `dart run cerebro init --navigator`. The factory then
+returns only the root widget plus optional `argumentsFor(location)`; route
+names are read from the running `MaterialApp`, each screen is opened with
+`pushNamedAndRemoveUntil` like a deep link, and explore edges come from the
+`ModalRoute` stack. Arguments can also be given in `cerebro.yaml` as
+`routes.<name>.args` (YAML values). Apps without a dark theme should set
+`themes: [light]`.
+
+### Real apps: plugins, network, fonts
+
+What a medium-sized production app needed to capture cleanly (all of it
+lives in `test/cerebro/app_factory.dart` and `cerebro.yaml`, nothing in
+`lib/`):
+
+- **Plugins** have no implementation under `flutter test`. Screens that
+  await `flutter_secure_storage`, `shared_preferences`, permissions or
+  geolocation stay on their spinner forever. Mock the channels in
+  `buildApp()` (`SharedPreferences.setMockInitialValues({})`,
+  `TestDefaultBinaryMessengerBinding...setMockMethodCallHandler(...)`
+  returning `null`/empty maps). Firebase that is only initialised in
+  `main()` needs nothing: the factory never runs `main()`.
+- **Network**: set `real_async_ms: 500`. The test binding answers every
+  HTTP request with 400, so screens settle to their error/empty state
+  instead of spinning in the fake-async zone.
+- **google_fonts** cannot fetch in tests. Download the TTFs once (OFL)
+  into `test/cerebro/fonts/`, set `GoogleFonts.config.allowRuntimeFetching
+  = false` in the factory, and list them in `fonts:` under the family
+  names google_fonts registers: `<Family>_regular`, `<Family>_500`,
+  `<Family>_600`, `<Family>_700`, `<Family>_italic`, `<Family>_700italic`.
+  Add a plain `<Family>` entry for `TextStyle(fontFamily:)` uses.
+- **Auth guards**: screens that pop when no user is stored land on the
+  initial route; `map.json` records `redirected_to` and the audit skill
+  reports the redirect once instead of auditing the login screen 20 times.
+
+Routes with `:params` need sample values in `cerebro.yaml` (a list gives one
+capture per value, e.g. a live, a sold and a missing item); screens that
+hit the network or platform channels at build time will render their
+error/empty branch (no HTTP in `flutter test`).
+
 ## Does it change the result? A benchmark
 
 I gave the same brief to the same model seven times and compared what came
@@ -113,35 +265,6 @@ Limits worth stating: one brief, one model, three runs with the toolkit
 and one each for the other arms; the first "with skills" run was not
 better than the baseline, it had simply not used the skills, which is why
 the trigger was fixed and the run repeated.
-
-## Prerequisites
-
-- **Flutter SDK ≥ 3.44** on the `PATH` (`flutter doctor` passes for at
-  least one desktop target; no emulator or device is needed). Install from
-  <https://docs.flutter.dev/get-started/install>.
-- An app that uses **`go_router` ≥ 18** or plain `MaterialApp.routes`.
-- **Claude Code** or **Codex CLI** to run the skills.
-- **Node.js** only if you install the skills with `npx skills add`; see the
-  manual copy below if you prefer not to.
-
-## Quick start (5 minutes)
-
-```bash
-git clone git@github.com:mattparadis/cerebro-flutter.git
-cd cerebro-flutter/example/demo_app
-flutter pub get
-dart run cerebro capture          # writes .cerebro/ with 48 screenshots in ~30 s
-claude                           # or: codex
-```
-
-then ask: *audit the screens of this app*. The demo app ships the skills
-under `.claude/skills` and `.agents/skills`, so nothing else is needed.
-To use it on your own app, see [Install in your own app](#install-in-your-own-app).
-
-| Skill | Ask for | What it does |
-|---|---|---|
-| `cerebro-audit` | "audit / review / critique the screens of this app" | captures (or reuses) the map, reads every PNG and semantics dump, applies the checklist and Nielsen's heuristics, writes `.cerebro/audit/<screen>.md` + `SUMMARY.md` with the highest-leverage change |
-| `cerebro-design` | "design / prototype / redesign the X screen" | writes a 5-line brief, inherits the app's conventions from the map and theme, then either renders 2-3 prototype directions behind a `UI_PROTO` flag for you to pick, or builds the real screen with all states, captures it and self-audits before presenting |
 
 ## How it works
 
@@ -285,115 +408,6 @@ creation flow, on the other hand, is a worked example of a flow contract:
 `test/flows/create_note_flow_test.dart` proves persistence, in-flight
 protection, error + retry and discard confirmation against the in-memory
 repository.
-
-## Install in your own app
-
-Three pieces: the skills (Markdown folders the agent reads), the `cerebro`
-tool (a Dart dev dependency), and the factory file that tells `cerebro`
-how to build your app. Run everything from your app's root (where
-`pubspec.yaml` is).
-
-### 1. The skills
-
-With Node.js, from your app's root:
-
-```bash
-# Claude Code → .claude/skills/<name>, Codex → .agents/skills/<name>
-npx skills add mattparadis/cerebro-flutter --skill cerebro-audit
-npx skills add mattparadis/cerebro-flutter --skill cerebro-design
-```
-
-The CLI asks which agents to install for and remembers the answer: tick
-both Claude Code and Codex, or pass `-a claude-code,codex` (or `-a '*'`).
-Add `-g` to install for every project instead of the current one.
-
-Or by hand: copy (or symlink) `skills/cerebro-audit` and
-`skills/cerebro-design` from a clone of this repo into `.claude/skills/`
-(Claude Code) and/or `.agents/skills/` (Codex) inside your app. Each
-skill is self-contained: `SKILL.md` plus its `references/` folder.
-
-```bash
-git clone git@github.com:mattparadis/cerebro-flutter.git ~/cerebro-flutter
-mkdir -p .claude/skills .agents/skills
-for s in cerebro-audit cerebro-design; do
-  ln -s ~/cerebro-flutter/skills/$s .claude/skills/$s
-  ln -s ~/cerebro-flutter/skills/$s .agents/skills/$s
-done
-```
-
-To make a skill available in every project instead of one, put it under
-`~/.claude/skills/` (Claude Code) or `~/.agents/skills/` (Codex).
-Restart the agent after installing; verify with `/skills` in Claude Code.
-
-### 2. The tool
-
-```bash
-# as a dev dependency (SSH form while the repo is private; needs a GitHub
-# account with access to the repo and an SSH key)
-dart pub add 'dev:cerebro:{"git":{"url":"git@github.com:mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
-# or, from a local clone:
-dart pub add 'dev:cerebro:{"path":"../cerebro-flutter/packages/cerebro"}'
-```
-
-### 3. The factory
-
-```bash
-dart run cerebro init           # writes cerebro.yaml + test/cerebro/app_factory.dart
-dart run cerebro routes         # lists the locations it will capture; add params in cerebro.yaml
-dart run cerebro capture        # .cerebro/map.json, MAP.md, screens/, semantics/
-```
-
-`init` leaves two `UnimplementedError` stubs in `app_factory.dart`:
-`buildRouter({required String initialLocation})` returns your `GoRouter`
-with that initial location, and `buildApp(GoRouter router, {required
-ThemeMode themeMode})` returns your root `MaterialApp.router` using that
-router and theme mode. Usually both are one-line calls into functions you
-already have in `lib/`. The audit skill fills them in itself when it can
-find those functions; you only have to do it by hand when the router is
-built behind dependency injection the test cannot call.
-
-Add `.cerebro/` to `.gitignore` unless you want the screenshots in the
-repo (keep `.cerebro/baseline/` if you use `cerebro check`, see below).
-
-**Navigator 1.0 apps** (`MaterialApp` with `routes:` and `Navigator.pushNamed`,
-no go_router): run `dart run cerebro init --navigator`. The factory then
-returns only the root widget plus optional `argumentsFor(location)`; route
-names are read from the running `MaterialApp`, each screen is opened with
-`pushNamedAndRemoveUntil` like a deep link, and explore edges come from the
-`ModalRoute` stack. Arguments can also be given in `cerebro.yaml` as
-`routes.<name>.args` (YAML values). Apps without a dark theme should set
-`themes: [light]`.
-
-### Real apps: plugins, network, fonts
-
-What a medium-sized production app needed to capture cleanly (all of it
-lives in `test/cerebro/app_factory.dart` and `cerebro.yaml`, nothing in
-`lib/`):
-
-- **Plugins** have no implementation under `flutter test`. Screens that
-  await `flutter_secure_storage`, `shared_preferences`, permissions or
-  geolocation stay on their spinner forever. Mock the channels in
-  `buildApp()` (`SharedPreferences.setMockInitialValues({})`,
-  `TestDefaultBinaryMessengerBinding...setMockMethodCallHandler(...)`
-  returning `null`/empty maps). Firebase that is only initialised in
-  `main()` needs nothing: the factory never runs `main()`.
-- **Network**: set `real_async_ms: 500`. The test binding answers every
-  HTTP request with 400, so screens settle to their error/empty state
-  instead of spinning in the fake-async zone.
-- **google_fonts** cannot fetch in tests. Download the TTFs once (OFL)
-  into `test/cerebro/fonts/`, set `GoogleFonts.config.allowRuntimeFetching
-  = false` in the factory, and list them in `fonts:` under the family
-  names google_fonts registers: `<Family>_regular`, `<Family>_500`,
-  `<Family>_600`, `<Family>_700`, `<Family>_italic`, `<Family>_700italic`.
-  Add a plain `<Family>` entry for `TextStyle(fontFamily:)` uses.
-- **Auth guards**: screens that pop when no user is stored land on the
-  initial route; `map.json` records `redirected_to` and the audit skill
-  reports the redirect once instead of auditing the login screen 20 times.
-
-Routes with `:params` need sample values in `cerebro.yaml` (a list gives one
-capture per value, e.g. a live, a sold and a missing item); screens that
-hit the network or platform channels at build time will render their
-error/empty branch (no HTTP in `flutter test`).
 
 ## Coverage: quick and extended profiles
 
