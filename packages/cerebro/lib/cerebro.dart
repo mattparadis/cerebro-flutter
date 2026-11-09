@@ -11,3 +11,4 @@ export 'src/fonts.dart';
 export 'src/lint.dart';
 export 'src/map_writer.dart';
 export 'src/routes.dart';
+export 'src/nav_map.dart' show NavMap, NavNode, NavEdgeGroup;

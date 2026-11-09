@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'edges.dart';
+import 'nav_map.dart';
 
 /// Merges `routes.json`, `fonts.json` and `results/*.json` into `map.json`
 /// and renders `MAP.md` (Mermaid route tree + thumbnail table).
@@ -87,6 +88,8 @@ class MapWriter {
       'no_effect_taps': noEffect,
       'screens': screens,
     };
+    final navMap = NavMap.write(outDir, screens, edges);
+    if (navMap != null) map['nav_map'] = navMap;
     File(p.join(outDir, 'map.json')).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(map));
     File(p.join(outDir, 'MAP.md')).writeAsStringSync(renderMarkdown(map));
     return map;
@@ -99,6 +102,34 @@ class MapWriter {
     final summary = (map['summary'] as Map?) ?? const {};
     b.writeln('# UI map');
     b.writeln();
+    final navMap = map['nav_map'] as Map?;
+    if (navMap != null) {
+      if (navMap['png'] != null) {
+        b.writeln('![Navigation map: one node per route, one arrow per tap result](${navMap['png']})');
+        b.writeln();
+        b.writeln('Blue = push, green = go, dashed grey = pop, dotted orange = overlay, red = tap that throws; '
+            '"(instant)" marks a transition with no animation. Source: `map.dot`, vector: `${navMap['svg']}`.');
+      } else if (navMap['dot'] != null) {
+        b.writeln('Navigation graph written to `map.dot`; render it with Graphviz: '
+            '`dot -Tpng -Gdpi=110 .cerebro/map.dot -o .cerebro/map.png` (Graphviz was not found on the PATH).');
+      }
+      final unreached = (navMap['unreached'] as List?) ?? const [];
+      if (unreached.isNotEmpty) {
+        b.writeln();
+        b.writeln('Routes no explored tap leads to or from (reached only by deep link in this capture, '
+            'so they are left out of the picture): ${unreached.map((r) => '`$r`').join(', ')}.');
+      }
+      final unresolved = (navMap['unresolved_targets'] as List?) ?? const [];
+      if (unresolved.isNotEmpty) {
+        b.writeln();
+        b.writeln('${unresolved.length} tap target(s) could not be matched to a captured route '
+            '(${unresolved.take(3).map((r) => '`$r`').join(', ')}${unresolved.length > 3 ? ', …' : ''}): '
+            'pushes to routes without a name (Navigator 1.0 `MaterialPageRoute` built inline) or to '
+            'locations not in `cerebro.yaml`. Name them in `MaterialApp.routes`, or add their params, '
+            'and they will appear as nodes.');
+      }
+      b.writeln();
+    }
     b.writeln('Generated ${map['generated_at']} · ${summary['screens']} screenshots · '
         '${summary['error']} errors · ${summary['with_exceptions']} with layout exceptions · '
         '${summary['with_small_tappables']} with tap targets below minimum · '

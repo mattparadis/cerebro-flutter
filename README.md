@@ -14,6 +14,13 @@ example/demo_app/         go_router app with planted defects, used as fixture
 experiments/              the Rigattiere benchmark below: prompts, runner, per-run reports, sheets
 ```
 
+![Navigation map of the demo app: one node per route with its real screenshot, one arrow per tap result](docs/img/demo-map.png)
+
+*What `dart run cerebro capture --explore` writes for the demo app: every
+route as its real screenshot, every arrow a tap the explorer made. Blue is
+a push, green a go, dashed grey a pop, dotted orange an overlay, red a tap
+that threw; "(instant)" marks a transition with no animation.*
+
 Works with `go_router` and plain `MaterialApp.routes`, on any host with the
 Flutter SDK. Status: v0.1, Apache-2.0. The tool was called `ui_map` until
 November 2026; `// ui_map: ignore` comments are still honoured.
@@ -39,16 +46,18 @@ November 2026; `// ui_map: ignore` comments are still honoured.
   <https://docs.flutter.dev/get-started/install>.
 - An app that uses **`go_router` ≥ 18** or plain `MaterialApp.routes`.
 - **Claude Code** or **Codex CLI** to run the skills.
+- **Graphviz** (`dot`) only for the navigation map picture; without it
+  you still get `map.dot` and everything else.
 - **Node.js** only if you install the skills with `npx skills add`; see the
   manual copy below if you prefer not to.
 
 ## Quick start (5 minutes)
 
 ```bash
-git clone git@github.com:mattparadis/cerebro-flutter.git
+git clone https://github.com/mattparadis/cerebro-flutter.git
 cd cerebro-flutter/example/demo_app
 flutter pub get
-dart run cerebro capture          # writes .cerebro/ with 48 screenshots in ~30 s
+dart run cerebro capture          # writes .cerebro/ with 56 screenshots in ~30 s
 claude                           # or: codex
 ```
 
@@ -70,31 +79,29 @@ how to build your app. Run everything from your app's root (where
 
 ### 1. The skills
 
-With Node.js, from your app's root:
+Each skill is a folder: `SKILL.md` plus its `references/`. Copy or
+symlink `skills/cerebro-audit` and `skills/cerebro-design` from a clone
+of this repo into `.claude/skills/` (Claude Code) and/or `.agents/skills/`
+(Codex) inside your app:
 
 ```bash
-# Claude Code → .claude/skills/<name>, Codex → .agents/skills/<name>
-npx skills add mattparadis/cerebro-flutter --skill cerebro-audit
-npx skills add mattparadis/cerebro-flutter --skill cerebro-design
-```
-
-The CLI asks which agents to install for and remembers the answer: tick
-both Claude Code and Codex, or pass `-a claude-code,codex` (or `-a '*'`).
-Add `-g` to install for every project instead of the current one.
-
-Or by hand: copy (or symlink) `skills/cerebro-audit` and
-`skills/cerebro-design` from a clone of this repo into `.claude/skills/`
-(Claude Code) and/or `.agents/skills/` (Codex) inside your app. Each
-skill is self-contained: `SKILL.md` plus its `references/` folder.
-
-```bash
-git clone git@github.com:mattparadis/cerebro-flutter.git ~/cerebro-flutter
+git clone https://github.com/mattparadis/cerebro-flutter.git ~/cerebro-flutter
 mkdir -p .claude/skills .agents/skills
 for s in cerebro-audit cerebro-design; do
   ln -s ~/cerebro-flutter/skills/$s .claude/skills/$s
   ln -s ~/cerebro-flutter/skills/$s .agents/skills/$s
 done
 ```
+
+With Node.js, the same in one line:
+
+```bash
+# Claude Code → .claude/skills/<name>, Codex → .agents/skills/<name>
+npx skills add mattparadis/cerebro-flutter -a claude-code,codex
+```
+
+(`--skill cerebro-audit` installs one of the two; `-g` installs for every
+project instead of the current one.)
 
 To make a skill available in every project instead of one, put it under
 `~/.claude/skills/` (Claude Code) or `~/.agents/skills/` (Codex).
@@ -103,9 +110,8 @@ Restart the agent after installing; verify with `/skills` in Claude Code.
 ### 2. The tool
 
 ```bash
-# as a dev dependency (SSH form while the repo is private; needs a GitHub
-# account with access to the repo and an SSH key)
-dart pub add 'dev:cerebro:{"git":{"url":"git@github.com:mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
+# as a dev dependency, straight from GitHub
+dart pub add 'dev:cerebro:{"git":{"url":"https://github.com/mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
 # or, from a local clone:
 dart pub add 'dev:cerebro:{"path":"../cerebro-flutter/packages/cerebro"}'
 ```
@@ -280,7 +286,8 @@ the trigger was fixed and the run repeated.
    | File | Content |
    |---|---|
    | `.cerebro/map.json` | summary, fonts report, route tree, skipped routes, one entry per screen (png, semantics, layout exceptions, `tappables_below_min`, `low_contrast` with measured WCAG ratios, sha256) |
-   | `.cerebro/MAP.md` | navigation tree as Mermaid + thumbnail table |
+   | `.cerebro/MAP.md` | the navigation map picture, route tree, thumbnail table, coverage, capture limits |
+   | `.cerebro/map.dot`, `map.png`, `map.svg` | with `--explore`: the explored graph, one node per route with its screenshot, one arrow per tap result; PNG/SVG need Graphviz, the `.dot` is always written |
    | `.cerebro/screens/*.png` | screenshots with real Roboto / Material Icons glyphs; simulated system insets drawn as translucent bands so missing `SafeArea` is visible |
    | `.cerebro/semantics/*.txt` | semantics tree dump, deterministic across runs |
 
@@ -342,8 +349,8 @@ test-only wiring needed.
 ```bash
 cd example/demo_app
 flutter pub get
-dart run cerebro routes                     # 12 locations, incl. /notes?state=empty|loading|error
-dart run cerebro capture                    # 48 PNGs (12 locations × light/dark × 1.0/1.3 text) in ~30 s
+dart run cerebro routes                     # 14 locations, incl. /notes?state=empty|loading|error
+dart run cerebro capture                    # 56 PNGs (14 locations × light/dark × 1.0/1.3 text) in ~30 s
 dart run cerebro capture -D UI_PROTO=true   # + the two prototype directions under /__proto/note-detail
 dart run cerebro capture --explore          # + real navigation edges by tapping every target
 ```
