@@ -1,22 +1,118 @@
-# Flutter UI/UX agent skills + `ui_map`
+# Cerebro: Flutter UI/UX agent skills + headless screen capture
 
-Agent skills for **Claude Code** and **Codex CLI** that design and audit
-Flutter mobile UI/UX from what the user actually sees, backed by `ui_map`:
-a small Dart tool that captures one screenshot per `go_router` route
-**headlessly** (no emulator, no device), dumps the semantics tree, flags
-touch targets below the minimum, and builds a navigation map the agent can
-read.
-
-Status: **v0.1**. Two skills, one tool, one demo app. Works on Linux,
-macOS and Windows hosts with the Flutter SDK only.
+Two agent skills for **Claude Code** and **Codex CLI** that design and
+audit Flutter mobile UI from what the user actually sees, and `cerebro`,
+the Dart tool they lean on: one headless screenshot per route (no emulator),
+semantics dump, touch-target and contrast measurement, a navigation map
+built by tapping every control, and motion evidence for every tap.
 
 ```
-skills/audit-screens/     audit existing screens: checklist (40 items), Nielsen heuristics, report template
-skills/design-screen/     design new screens: prototype mode (2-3 directions as PNGs) and build mode,
-                          with Material 3, Apple HIG / Cupertino, patterns and anti-pattern references
-packages/ui_map/          Dart package: `dart run ui_map init | routes | capture`
-example/demo_app/         Flutter app with planted design defects, used as fixture
+skills/cerebro-design/     brief → 2-3 rendered prototype directions → build with all states → capture and self-audit
+skills/cerebro-audit/     capture every screen, apply a Flutter-specific checklist + Nielsen, write per-screen reports
+packages/cerebro/          dart run cerebro init | routes | capture [--explore] | lint | baseline | diff | check
+example/demo_app/         go_router app with planted defects, used as fixture
+experiments/              the Rigattiere benchmark below: prompts, runner, per-run reports, sheets
 ```
+
+Works with `go_router` and plain `MaterialApp.routes`, on any host with the
+Flutter SDK. Status: v0.1, Apache-2.0. The tool was called `ui_map` until
+November 2026; `// ui_map: ignore` comments are still honoured.
+
+## Does it change the result? A benchmark
+
+I gave the same brief to the same model seven times and compared what came
+out. The brief: "Rigattiere", a second-hand marketplace app with five
+screens, a precise offer flow (send, double tap, failure and retry, accept,
+decline, expire) and a detailed aesthetic direction. The model: Claude
+Opus 5.5, headless, same permissions, a fresh empty Flutter project every
+time. The only thing that changed between runs is whether the skills and
+`cerebro` were available (and, in the later runs, whether fonts could be
+downloaded). Prompts, runner and per-run reports are in
+[`experiments/`](experiments/).
+
+![Without and with the toolkit](docs/img/benchmark-a2-vs-b3.jpg)
+
+*Top row: no skills, no tool. Middle and bottom rows: skills + `cerebro`,
+two independent runs. Left to right: browse, item, a chat with an offer,
+the sell form with the keyboard open, the seller's side of an offer.*
+
+### How I measured
+
+Every finished app was captured with the same `cerebro` configuration: one
+phone size, light and dark, text at 1.0× and 1.3×, keyboard open on the
+form and the chat, and the explorer tapping every control on every
+screen. Four numbers from that capture:
+
+- **Small tap targets**: screens with a control under 48 dp (Android
+  minimum). Controls merely cut off by a scroll edge or the keyboard are
+  not counted.
+- **Low contrast**: screens with text under the WCAG AA ratio for its
+  size. Text hidden under a floating button is not counted.
+- **Crashes on tap**: controls that throw an exception when tapped.
+- **Page transitions**: of all the taps that navigated to another screen,
+  how many animated and how many jumped instantly (a Flutter app with no
+  page transition looks broken on a phone).
+
+### Results
+
+Three runs had the toolkit, four did not (two of those four had the skills
+on disk but never used them, which counts as not having them).
+
+| | Without the toolkit (4 runs) | With skills + `cerebro` (3 runs) |
+|---|---|---|
+| Screens with small tap targets | 0 to **28** | 0 |
+| Screens with low contrast | 5 to **16** | 2 to 5 |
+| Crashes on tap | 2 of 4 runs had one | none |
+| Page transitions animated / instant | 0-9 animated, 37-48 instant | **43-46 animated, 0-5 instant** |
+| Prototype step before building | never | 3 directions per key screen, rendered and scored |
+| Time and cost per run | 24-39 min, $6-8 | 32-33 min, $9.5-9.7 |
+
+What this says, in plain words:
+
+1. **Without a capture loop nothing animates and nobody notices.** In
+   every run without the tool, go_router silently used pages with no
+   transition. The agents with `cerebro` saw `instant` next to each
+   navigation in their own capture, fixed it and wrote a regression test.
+2. **The tool finds the bugs the agent cannot see.** Two independent
+   no-tool runs shipped the same crash (scrolling a list that is not on
+   screen). The explorer reports it as a tap that throws.
+3. **Process becomes stable, taste stays open.** The three toolkit runs
+   share structure and measured quality but chose three different display
+   typefaces and disagreed on a bottom bar. That is exactly what the
+   prototype step is for: a person picks among rendered directions.
+4. **Fonts were not the trick.** A no-tool run that was allowed to
+   download the same fonts still shipped with instant transitions, no
+   prototype step and no capture.
+
+![Prototype sheet](docs/img/proto-sheet-b3b.jpg)
+
+*The prototype step as the agent sees it: `cerebro` renders the directions
+side by side (`.cerebro/proto/<screen>.png`). Someone picks one before
+anything is built.*
+
+<details>
+<summary>Every run</summary>
+
+| Run | Skills | `cerebro` | Fonts downloadable | Small targets | Low contrast | Crash on tap | Transitions animated / instant |
+|---|---|---|---|---|---|---|---|
+| no toolkit | no | no | no | 28 | 6 | 1 | 0 / 40 |
+| skills on disk, never invoked | listed | no | no | 0 | 16 | 1 | 0 / 43 |
+| skills used, tool never run | yes | installed, not run | no | 0 | 6 | 0 | 9 / 48 |
+| no toolkit, fonts downloadable | no | no | yes | 2 | 5 | 0 | 9 / 37 |
+| toolkit | yes | yes | yes | 0 | 5 | 0 | 45 / 5 |
+| toolkit, repeat | yes | yes | yes | 0 | 3 | 0 | 43 / 5 |
+| toolkit, no mention of it in the prompt | self-triggered | yes | yes | 0 | 2 | 0 | 46 / 0 |
+
+Numbers are screens (out of 84-96 captures per run) or taps. Full tables,
+every finding with its status, and the comparison sheets:
+[`experiments/rigattiere-results.md`](experiments/rigattiere-results.md).
+
+</details>
+
+Limits worth stating: one brief, one model, three runs with the toolkit
+and one each for the other arms; the first "with skills" run was not
+better than the baseline, it had simply not used the skills, which is why
+the trigger was fixed and the run repeated.
 
 ## Prerequisites
 
@@ -31,10 +127,10 @@ example/demo_app/         Flutter app with planted design defects, used as fixtu
 ## Quick start (5 minutes)
 
 ```bash
-git clone git@github.com:mattparadis/flutter-ui-ux-design-skill.git
-cd flutter-ui-ux-design-skill/example/demo_app
+git clone git@github.com:mattparadis/cerebro-flutter.git
+cd cerebro-flutter/example/demo_app
 flutter pub get
-dart run ui_map capture          # writes .ui-map/ with 48 screenshots in ~30 s
+dart run cerebro capture          # writes .cerebro/ with 48 screenshots in ~30 s
 claude                           # or: codex
 ```
 
@@ -44,31 +140,31 @@ To use it on your own app, see [Install in your own app](#install-in-your-own-ap
 
 | Skill | Ask for | What it does |
 |---|---|---|
-| `audit-screens` | "audit / review / critique the screens of this app" | captures (or reuses) the map, reads every PNG and semantics dump, applies the checklist and Nielsen's heuristics, writes `.ui-map/audit/<screen>.md` + `SUMMARY.md` with the highest-leverage change |
-| `design-screen` | "design / prototype / redesign the X screen" | writes a 5-line brief, inherits the app's conventions from the map and theme, then either renders 2-3 prototype directions behind a `UI_PROTO` flag for you to pick, or builds the real screen with all states, captures it and self-audits before presenting |
+| `cerebro-audit` | "audit / review / critique the screens of this app" | captures (or reuses) the map, reads every PNG and semantics dump, applies the checklist and Nielsen's heuristics, writes `.cerebro/audit/<screen>.md` + `SUMMARY.md` with the highest-leverage change |
+| `cerebro-design` | "design / prototype / redesign the X screen" | writes a 5-line brief, inherits the app's conventions from the map and theme, then either renders 2-3 prototype directions behind a `UI_PROTO` flag for you to pick, or builds the real screen with all states, captures it and self-audits before presenting |
 
 ## How it works
 
-1. `dart run ui_map init` scaffolds `ui_map.yaml` and
-   `test/ui_map/app_factory.dart`, where you expose two functions:
+1. `dart run cerebro init` scaffolds `cerebro.yaml` and
+   `test/cerebro/app_factory.dart`, where you expose two functions:
    `buildRouter({required String initialLocation})` and
    `buildApp(GoRouter router, {required ThemeMode themeMode})`.
-2. `dart run ui_map capture` runs a generated `flutter test` that walks
+2. `dart run cerebro capture` runs a generated `flutter test` that walks
    `router.configuration.routes` (GoRoute, ShellRoute, StatefulShellRoute
    branches), opens the app on every location, renders it at the configured
    device sizes in light and dark, and writes:
 
    | File | Content |
    |---|---|
-   | `.ui-map/map.json` | summary, fonts report, route tree, skipped routes, one entry per screen (png, semantics, layout exceptions, `tappables_below_min`, `low_contrast` with measured WCAG ratios, sha256) |
-   | `.ui-map/MAP.md` | navigation tree as Mermaid + thumbnail table |
-   | `.ui-map/screens/*.png` | screenshots with real Roboto / Material Icons glyphs; simulated system insets drawn as translucent bands so missing `SafeArea` is visible |
-   | `.ui-map/semantics/*.txt` | semantics tree dump, deterministic across runs |
+   | `.cerebro/map.json` | summary, fonts report, route tree, skipped routes, one entry per screen (png, semantics, layout exceptions, `tappables_below_min`, `low_contrast` with measured WCAG ratios, sha256) |
+   | `.cerebro/MAP.md` | navigation tree as Mermaid + thumbnail table |
+   | `.cerebro/screens/*.png` | screenshots with real Roboto / Material Icons glyphs; simulated system insets drawn as translucent bands so missing `SafeArea` is visible |
+   | `.cerebro/semantics/*.txt` | semantics tree dump, deterministic across runs |
 
-3. The `audit-screens` skill reads the map and the images, applies a
+3. The `cerebro-audit` skill reads the map and the images, applies a
    Flutter-specific checklist (hierarchy, type scale, contrast, touch
    targets, states, navigation idiom, dark mode) and writes
-   `.ui-map/audit/<screen>.md` plus `SUMMARY.md` with the single
+   `.cerebro/audit/<screen>.md` plus `SUMMARY.md` with the single
    highest-leverage change.
 
 With `--explore` (or `explore: true`), the harness also taps every
@@ -99,23 +195,23 @@ is below 1.3:1, goes to `contrast_not_measurable` with reason
 also has `self_transition`, the motion inside the tapped control itself.
 
 Prototype routes (`/__proto/<name>`, captured with `-D UI_PROTO=true`) are
-also composed into one sheet per screen, `.ui-map/proto/<name>.png` (one
-column per direction, one row per theme), listed in `.ui-map/PROTO.md`.
+also composed into one sheet per screen, `.cerebro/proto/<name>.png` (one
+column per direction, one row per theme), listed in `.cerebro/PROTO.md`.
 
 Large-text variants (`text_scales: [1.0, 1.3]`) and prototype routes
-(`dart run ui_map capture -D UI_PROTO=true`) are captured the same way.
+(`dart run cerebro capture -D UI_PROTO=true`) are captured the same way.
 
 Screen **states** come from two mechanisms. **Scenarios** are named
-fixtures in `test/ui_map/app_factory.dart` (`scenarios: {'empty': () async
+fixtures in `test/cerebro/app_factory.dart` (`scenarios: {'empty': () async
 => FakeRepo.items = [], 'logged-in': ...}` plus a `resetScenario` that runs
-before every screen); `ui_map.yaml` applies them per route
+before every screen); `cerebro.yaml` applies them per route
 (`routes."/orders".scenarios: [empty, error]`) or to every screen
 (`default_scenario: logged-in`). Each becomes a screen with an `__s-<name>`
 id. They work with any architecture that has a test seam (a static
 override, a DI container, an in-memory repository) and need no URL support.
 Alternatively, **URL variants** are addressed as locations: a list screen that reads
 `?state=empty|loading|error` from `GoRouterState.uri.queryParameters` can
-be captured in every state by listing `variants` in `ui_map.yaml`. No
+be captured in every state by listing `variants` in `cerebro.yaml`. No
 test-only wiring needed.
 
 ## Try it on the demo app
@@ -123,10 +219,10 @@ test-only wiring needed.
 ```bash
 cd example/demo_app
 flutter pub get
-dart run ui_map routes                     # 12 locations, incl. /notes?state=empty|loading|error
-dart run ui_map capture                    # 48 PNGs (12 locations × light/dark × 1.0/1.3 text) in ~30 s
-dart run ui_map capture -D UI_PROTO=true   # + the two prototype directions under /__proto/note-detail
-dart run ui_map capture --explore          # + real navigation edges by tapping every target
+dart run cerebro routes                     # 12 locations, incl. /notes?state=empty|loading|error
+dart run cerebro capture                    # 48 PNGs (12 locations × light/dark × 1.0/1.3 text) in ~30 s
+dart run cerebro capture -D UI_PROTO=true   # + the two prototype directions under /__proto/note-detail
+dart run cerebro capture --explore          # + real navigation edges by tapping every target
 ```
 
 The generated `MAP.md` starts with the route tree:
@@ -192,8 +288,8 @@ repository.
 
 ## Install in your own app
 
-Three pieces: the skills (Markdown folders the agent reads), the `ui_map`
-tool (a Dart dev dependency), and the factory file that tells `ui_map`
+Three pieces: the skills (Markdown folders the agent reads), the `cerebro`
+tool (a Dart dev dependency), and the factory file that tells `cerebro`
 how to build your app. Run everything from your app's root (where
 `pubspec.yaml` is).
 
@@ -203,25 +299,25 @@ With Node.js, from your app's root:
 
 ```bash
 # Claude Code → .claude/skills/<name>, Codex → .agents/skills/<name>
-npx skills add mattparadis/flutter-ui-ux-design-skill --skill audit-screens
-npx skills add mattparadis/flutter-ui-ux-design-skill --skill design-screen
+npx skills add mattparadis/cerebro-flutter --skill cerebro-audit
+npx skills add mattparadis/cerebro-flutter --skill cerebro-design
 ```
 
 The CLI asks which agents to install for and remembers the answer: tick
 both Claude Code and Codex, or pass `-a claude-code,codex` (or `-a '*'`).
 Add `-g` to install for every project instead of the current one.
 
-Or by hand: copy (or symlink) `skills/audit-screens` and
-`skills/design-screen` from a clone of this repo into `.claude/skills/`
+Or by hand: copy (or symlink) `skills/cerebro-audit` and
+`skills/cerebro-design` from a clone of this repo into `.claude/skills/`
 (Claude Code) and/or `.agents/skills/` (Codex) inside your app. Each
 skill is self-contained: `SKILL.md` plus its `references/` folder.
 
 ```bash
-git clone git@github.com:mattparadis/flutter-ui-ux-design-skill.git ~/flutter-ui-ux-design-skill
+git clone git@github.com:mattparadis/cerebro-flutter.git ~/cerebro-flutter
 mkdir -p .claude/skills .agents/skills
-for s in audit-screens design-screen; do
-  ln -s ~/flutter-ui-ux-design-skill/skills/$s .claude/skills/$s
-  ln -s ~/flutter-ui-ux-design-skill/skills/$s .agents/skills/$s
+for s in cerebro-audit cerebro-design; do
+  ln -s ~/cerebro-flutter/skills/$s .claude/skills/$s
+  ln -s ~/cerebro-flutter/skills/$s .agents/skills/$s
 done
 ```
 
@@ -234,17 +330,17 @@ Restart the agent after installing; verify with `/skills` in Claude Code.
 ```bash
 # as a dev dependency (SSH form while the repo is private; needs a GitHub
 # account with access to the repo and an SSH key)
-dart pub add 'dev:ui_map:{"git":{"url":"git@github.com:mattparadis/flutter-ui-ux-design-skill.git","path":"packages/ui_map"}}'
+dart pub add 'dev:cerebro:{"git":{"url":"git@github.com:mattparadis/cerebro-flutter.git","path":"packages/cerebro"}}'
 # or, from a local clone:
-dart pub add 'dev:ui_map:{"path":"../flutter-ui-ux-design-skill/packages/ui_map"}'
+dart pub add 'dev:cerebro:{"path":"../cerebro-flutter/packages/cerebro"}'
 ```
 
 ### 3. The factory
 
 ```bash
-dart run ui_map init           # writes ui_map.yaml + test/ui_map/app_factory.dart
-dart run ui_map routes         # lists the locations it will capture; add params in ui_map.yaml
-dart run ui_map capture        # .ui-map/map.json, MAP.md, screens/, semantics/
+dart run cerebro init           # writes cerebro.yaml + test/cerebro/app_factory.dart
+dart run cerebro routes         # lists the locations it will capture; add params in cerebro.yaml
+dart run cerebro capture        # .cerebro/map.json, MAP.md, screens/, semantics/
 ```
 
 `init` leaves two `UnimplementedError` stubs in `app_factory.dart`:
@@ -256,22 +352,22 @@ already have in `lib/`. The audit skill fills them in itself when it can
 find those functions; you only have to do it by hand when the router is
 built behind dependency injection the test cannot call.
 
-Add `.ui-map/` to `.gitignore` unless you want the screenshots in the
-repo (keep `.ui-map/baseline/` if you use `ui_map check`, see below).
+Add `.cerebro/` to `.gitignore` unless you want the screenshots in the
+repo (keep `.cerebro/baseline/` if you use `cerebro check`, see below).
 
 **Navigator 1.0 apps** (`MaterialApp` with `routes:` and `Navigator.pushNamed`,
-no go_router): run `dart run ui_map init --navigator`. The factory then
+no go_router): run `dart run cerebro init --navigator`. The factory then
 returns only the root widget plus optional `argumentsFor(location)`; route
 names are read from the running `MaterialApp`, each screen is opened with
 `pushNamedAndRemoveUntil` like a deep link, and explore edges come from the
-`ModalRoute` stack. Arguments can also be given in `ui_map.yaml` as
+`ModalRoute` stack. Arguments can also be given in `cerebro.yaml` as
 `routes.<name>.args` (YAML values). Apps without a dark theme should set
 `themes: [light]`.
 
 ### Real apps: plugins, network, fonts
 
 What a medium-sized production app needed to capture cleanly (all of it
-lives in `test/ui_map/app_factory.dart` and `ui_map.yaml`, nothing in
+lives in `test/cerebro/app_factory.dart` and `cerebro.yaml`, nothing in
 `lib/`):
 
 - **Plugins** have no implementation under `flutter test`. Screens that
@@ -285,7 +381,7 @@ lives in `test/ui_map/app_factory.dart` and `ui_map.yaml`, nothing in
   HTTP request with 400, so screens settle to their error/empty state
   instead of spinning in the fake-async zone.
 - **google_fonts** cannot fetch in tests. Download the TTFs once (OFL)
-  into `test/ui_map/fonts/`, set `GoogleFonts.config.allowRuntimeFetching
+  into `test/cerebro/fonts/`, set `GoogleFonts.config.allowRuntimeFetching
   = false` in the factory, and list them in `fonts:` under the family
   names google_fonts registers: `<Family>_regular`, `<Family>_500`,
   `<Family>_600`, `<Family>_700`, `<Family>_italic`, `<Family>_700italic`.
@@ -294,7 +390,7 @@ lives in `test/ui_map/app_factory.dart` and `ui_map.yaml`, nothing in
   initial route; `map.json` records `redirected_to` and the audit skill
   reports the redirect once instead of auditing the login screen 20 times.
 
-Routes with `:params` need sample values in `ui_map.yaml` (a list gives one
+Routes with `:params` need sample values in `cerebro.yaml` (a list gives one
 capture per value, e.g. a live, a sold and a missing item); screens that
 hit the network or platform channels at build time will render their
 error/empty branch (no HTTP in `flutter test`).
@@ -307,25 +403,25 @@ large text, other locales, keyboard open, explore, device-only checks).
 The audit skill reports anything not executed as not verified. Two
 profiles:
 
-| Profile | `ui_map.yaml` |
+| Profile | `cerebro.yaml` |
 |---|---|
 | quick (PRs) | one phone, light (+dark), android, `text_scales: [1.0]` |
 | extended (releases) | `devices: [{name: small, width: 360, height: 640, dpr: 2}, {name: phone, ...}]`, `themes: [light, dark]`, `platforms: [android, ios]`, `text_scales: [1.0, 1.3, 2.0]`, `locales: [en, it, ar]`, `keyboard: true` on form routes, `--explore` |
 
-`skills/audit-screens/references/device-checks.md` lists the 13 checks
+`skills/cerebro-audit/references/device-checks.md` lists the 13 checks
 that need a device (screen reader order, back gesture, real keyboard,
 reduce motion, permissions, offline) with steps and pass criteria.
 
 ## Keep screenshots up to date: baseline, diff, check
 
 ```bash
-dart run ui_map capture      # current state
-dart run ui_map baseline     # copy it to .ui-map/baseline/ (commit this in your app)
+dart run cerebro capture      # current state
+dart run cerebro baseline     # copy it to .cerebro/baseline/ (commit this in your app)
 # ... change the app ...
-dart run ui_map check        # capture + diff; exit 1 on regressions
+dart run cerebro check        # capture + diff; exit 1 on regressions
 ```
 
-`check` writes `.ui-map/diff.json` and `.ui-map/DIFF.md` (before/after
+`check` writes `.cerebro/diff.json` and `.cerebro/DIFF.md` (before/after
 thumbnails) and classifies each change as **regression** (a finding that was
 not in the baseline, compared by identity: label or text plus size or
 contrast ratio, so a fixed defect next to a new one still surfaces the new
@@ -340,29 +436,29 @@ Pre-commit hook (`.git/hooks/pre-commit` or your hook manager):
 
 ```sh
 #!/bin/sh
-if git diff --cached --name-only | grep -qE '^(lib/|ui_map.yaml|pubspec.yaml)'; then
-  dart run ui_map check || { echo "ui_map: UI regressions, see .ui-map/DIFF.md"; exit 1; }
+if git diff --cached --name-only | grep -qE '^(lib/|cerebro.yaml|pubspec.yaml)'; then
+  dart run cerebro check || { echo "cerebro: UI regressions, see .cerebro/DIFF.md"; exit 1; }
 fi
 ```
 
 GitHub Actions step (after `flutter pub get`):
 
 ```yaml
-- run: dart run ui_map check --fail-on regression
+- run: dart run cerebro check --fail-on regression
 - uses: actions/upload-artifact@v4
   if: always()
-  with: { name: ui-map, path: .ui-map }
+  with: { name: cerebro, path: .cerebro }
 ```
 
-When a change is intentional, run `dart run ui_map baseline` again and
+When a change is intentional, run `dart run cerebro baseline` again and
 commit the new baseline with the code; the agent reading `DIFF.md` can
 tell you which screens to look at before you do.
 
-## Deterministic code rules: `ui_map lint`
+## Deterministic code rules: `cerebro lint`
 
 ```bash
-dart run ui_map lint            # .ui-map/lint.json + LINT.md, exit 1 on errors
-dart run ui_map lint --lint-fail-on warning
+dart run cerebro lint            # .cerebro/lint.json + LINT.md, exit 1 on errors
+dart run cerebro lint --lint-fail-on warning
 ```
 
 Regex rules for the design defects the Dart analyzer does not know about,
@@ -372,12 +468,12 @@ each with `file:line`: `hardcoded-color`, `literal-font-size`,
 `gesture-without-semantics`, `pump-and-settle` (tests). Severities:
 `error` and `warning` are structural defects; `hardcoded-color` and
 `literal-font-size` are `convention` findings, defects only when the
-rendered result is wrong. `// ui_map: ignore <reason>` on a line is a
+rendered result is wrong. `// cerebro: ignore <reason>` on a line is a
 motivated exception. Theme files and generated code are excluded by
-default; tune `lint.exclude` and `lint.rules` in `ui_map.yaml`. `check`
+default; tune `lint.exclude` and `lint.rules` in `cerebro.yaml`. `check`
 runs capture, diff and lint together.
 
-## `ui_map.yaml`
+## `cerebro.yaml`
 
 ```yaml
 devices:
@@ -401,7 +497,7 @@ routes:
   "/debug":     { skip: true }
 exclude: []
 fonts: {}                   # family -> font files, for custom fonts
-out_dir: .ui-map
+out_dir: .cerebro
 explore: false              # tap every target and record navigation edges
 explore_max_taps: 40
 lint:

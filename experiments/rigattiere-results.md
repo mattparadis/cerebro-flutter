@@ -1,5 +1,9 @@
 # Rigattiere A/B: results
 
+> Names in this document are the ones used during the runs: the tool was
+> `ui_map` (now `cerebro`), the skills `design-screen` / `audit-screens`
+> (now `cerebro-design` / `cerebro-audit`).
+
 > **Update, same day:** run B never invoked the skills (see "Run B2" at the
 > end). The A-vs-B comparison below is therefore two no-skill runs; the
 > valid skills-plus-tool run is B2.
@@ -303,3 +307,33 @@ What the two extra runs settle:
 
 Sheet: `rigattiere/sheet6-a-b3-b3b-b3n.jpg`. Sessions:
 `1e3be76e-c160-42d7-af6f-5b3e6d856b86` (B3b), `a09a8541-3993-4b46-bb9c-c3230a2bfb6b` (B3n).
+
+
+## Run A2: no skills, no tool, network open
+
+The control that was missing: `prompt-b3n.txt` (the original brief plus the
+line that says fonts can be downloaded), no skills linked, no `ui_map` in
+`pubspec.yaml`, `curl` allowed. Session `ead9bcf2-c3f8-4f9f-9a70-2686f0737b25`,
+39 min, $6.81, 125 turns, 38 widget tests, analyze clean. It downloaded and
+bundled Fraunces (variable) and Atkinson Hyperlegible, wrote its own
+`test_screenshots/` harness with 26 PNGs, and used `MaterialPage` on one
+route only (`/sell`).
+
+Standard capture (factory added by us, `FakeMarket` disposed with the tree
+because its offer timers otherwise outlive every test):
+
+| | A | **A2** | B3 | B3b | B3n |
+|---|---|---|---|---|---|
+| captures | 88 | 84 | 96 | 92 | 92 |
+| real tappables < 48 dp (screens) | 28 | 2 | 0 | 0 | 0 |
+| real low contrast (screens) | 6 | 5 (SOLD stamp 2.4:1, "11 h ago" 2.9:1) | 5 | 3 | 2 |
+| error edges | 1 | 0 | 0 | 0 | 0 |
+| navigation animated / instant | 0 / 40 | **9 / 37** | 45 / 5 | 43 / 5 | 46 / 0 |
+| state changes animated / instant | 37 / 46 | 38 / 43 | 38 / 60 | 16 / 74 | 35 / 68 |
+
+Reading: with the font gap removed, A2 closes most of the distance on
+targets and contrast (it is a careful run), but keeps the structural
+difference: no prototype step, no inbox or bottom bar, and page
+transitions missing on every route except the one it happened to declare
+with `MaterialPage`. The B3 runs found that defect in their own capture;
+A2 had no capture that could show it. Sheet: `docs/img/benchmark-a2-vs-b3.jpg`.
