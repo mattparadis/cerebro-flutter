@@ -1,6 +1,6 @@
 ---
 name: cerebro-audit
-description: Audit the UI/UX of a Flutter app from rendered screenshots and the semantics tree, not just source code. Use when asked to audit, review, critique or check the screens, UI, UX, design, accessibility, touch targets or dark mode of a Flutter app, or "what's wrong with these screens". Captures every go_router or Navigator 1.0 route headlessly with cerebro, then evaluates each screen against a Flutter-specific checklist and writes per-screen reports plus a summary.
+description: "Audit the UI/UX of a Flutter app from rendered screenshots and the semantics tree, not just source code. Use when asked to audit, review, critique or check the screens, UI, UX, design, accessibility, touch targets or dark mode of a Flutter app, or \"what's wrong with these screens\". Captures every go_router or Navigator 1.0 route headlessly with cerebro, then evaluates each screen against a Flutter-specific checklist and writes per-screen reports plus a summary."
 ---
 
 # Audit screens

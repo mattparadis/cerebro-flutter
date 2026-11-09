@@ -2,7 +2,7 @@
 # usage: run_one.sh <label> <dir> [prompt-file]
 set -u
 LABEL="$1"; DIR="$2"
-OUT=/home/matt/code/cerebro-flutter/experiments
+OUT="$(cd "$(dirname "$0")" && pwd)"
 PROMPT="$(cat "${3:-$OUT/prompt.txt}")"
 cd "$DIR" || exit 1
 START=$(date +%s)
@@ -24,4 +24,4 @@ except Exception as e:
     print('parse failed', e)
 PY
 MIN=$(( (END-START)/60 ))
-~/.claude/bin/tg "[rigattiere] run $LABEL finito in ${MIN} min, exit $CODE. Output: experiments/run-$LABEL.md"
+command -v tg >/dev/null 2>&1 && tg "[rigattiere] run $LABEL finito in ${MIN} min, exit $CODE. Output: experiments/run-$LABEL.md"

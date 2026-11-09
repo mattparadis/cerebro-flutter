@@ -1,6 +1,6 @@
 ---
 name: cerebro-design
-description: Design and build Flutter mobile UI with the right UI/UX theory, Material 3 / Apple HIG rules, the app's own conventions, and a capture-and-check loop with cerebro. Use whenever Flutter UI is being written or changed from a brief: a whole app or several screens from scratch, a new screen, page, flow, onboarding, paywall, settings, list, detail or form, a redesign, or a request to design, create, build, mock up, prototype or propose directions. Has a prototype mode that produces 2-3 throwaway directions as screenshots before any real code, and a build mode that ships the real screens. Covers setting up cerebro in a project that does not have it yet.
+description: "Design and build Flutter mobile UI with the right UI/UX theory, Material 3 / Apple HIG rules, the app's own conventions, and a capture-and-check loop with cerebro. Use whenever Flutter UI is being written or changed from a brief: a whole app or several screens from scratch, a new screen, page, flow, onboarding, paywall, settings, list, detail or form, a redesign, or a request to design, create, build, mock up, prototype or propose directions. Has a prototype mode that produces 2-3 throwaway directions as screenshots before any real code, and a build mode that ships the real screens. Covers setting up cerebro in a project that does not have it yet."
 ---
 
 # Design screen
