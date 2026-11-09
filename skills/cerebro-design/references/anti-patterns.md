@@ -89,3 +89,17 @@ When a signal is kept on purpose, say why in the brief.
   state_change edge on the screen's main action.
 - Motion with no cause: looping shimmer on loaded content, pulsing
   buttons. Signal: `continuous` on a screen that is not loading.
+
+## Touching controllers from a listener while the route is not current
+
+- A `ScrollController.jumpTo`/`animateTo`, `FocusNode.requestFocus` or
+  `TabController.animateTo` run from a notifier/stream listener. When the
+  listener fires while the screen sits under another route (a tab shell
+  keeps every branch alive; a pushed detail covers the list), the
+  controller has no attached position and throws
+  `ScrollController not attached to any scroll views`. Signal: an `error`
+  edge in cerebro explore on a tap that only changed state elsewhere; lint
+  `scroll-from-listener`. Fix: guard with `controller.hasClients` and, when
+  the scroll should be visible to the user, defer it until
+  `ModalRoute.of(context)?.isCurrent == true` (or run it in the branch's
+  own `didChangeDependencies`/`didPush` hook).

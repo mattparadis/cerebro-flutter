@@ -64,11 +64,6 @@ app is small): `map.json` then has `edges` (what every tap does),
 `no_effect_taps`, the count of `state_change` taps and, per edge, `transition`
 (`animated` / `instant` / `continuous` / `unknown`) with `transition_ms`, the
 motion evidence for checklist section I. Use them as evidence:
-Screens also list `tappables_clipped` (cut by a scroll edge or the keyboard;
-not a target finding) and `contrast_not_measurable` entries with reason
-`occluded by ...` (text under a FAB or sticky CTA; report the overlap as a
-layout observation, never as low contrast).
-
 - a `no_effect_taps` entry on a button, tile with a chevron, chip or link
   is a `suspected` "looks interactive, does nothing" finding (severity 3 on
   primary actions, 2 otherwise). Confirm it by reading the handler in the
@@ -78,10 +73,22 @@ layout observation, never as low contrast).
   working controls, not findings;
 - an `error` edge saying "nothing to pop" means the screen is reachable by
   deep link without a parent stack and its close/back action crashes
-  there (severity 2: guard with `context.canPop()` or use `go`);
+  there (severity 2: guard with `context.canPop()` or use `go`); any other
+  `error` edge carries `error_stack` (app frames first): quote the first
+  frame as the location of the defect;
 - compare `kind` with the navigation semantics in the checklist: a detail
   opened with `go` instead of `push` loses the back stack; a modal
   creation flow should be `push`.
+
+Screens also list `tappables_clipped` (cut by a scroll edge or the keyboard;
+not a target finding) and `contrast_not_measurable` entries with reason
+`occluded by ...` (text under a FAB or sticky CTA) or `not visible` (no glyph
+pixels in its rect: the text sits under an opaque bottom bar/sheet or is
+clipped). Report both as a layout observation ("list has no bottom padding
+for the fixed bar"), never as low contrast. A small or unlabeled target may
+carry a `hint` (an unlabeled checkbox/radio/switch next to its own text row:
+one finding, "merge into a `CheckboxListTile`/`RadioListTile`/`SwitchListTile`",
+not two).
 
 Read `coverage` in `map.json` (also rendered as "Coverage" in `MAP.md`):
 what was executed (devices, themes, platforms, text scales, locales,

@@ -68,7 +68,7 @@ Future<void> main(List<String> argv) async {
     exit(66);
   }
   final configPath = p.absolute(args['config'] as String? ?? p.join(root, 'cerebro.yaml'));
-  final outDir = p.absolute(args['out'] as String? ?? _outDirFromConfig(configPath) ?? p.join(root, '.cerebro'));
+  final outDir = p.absolute(args['out'] as String? ?? _outDirFromConfig(configPath, root) ?? p.join(root, '.cerebro'));
 
   final defines = [
     ...(args['dart-define'] as List<String>),
@@ -100,11 +100,13 @@ Future<void> main(List<String> argv) async {
   }
 }
 
-String? _outDirFromConfig(String configPath) {
+/// `out_dir` from the yaml, resolved against the project [root] (not the
+/// config file's folder: `--config` may point outside the project).
+String? _outDirFromConfig(String configPath, String root) {
   final f = File(configPath);
   if (!f.existsSync()) return null;
   final m = RegExp(r'^out_dir:\s*(\S+)', multiLine: true).firstMatch(f.readAsStringSync());
-  return m == null ? null : p.join(p.dirname(configPath), m.group(1)!);
+  return m == null ? null : p.join(root, m.group(1)!);
 }
 
 void _init(String root, String configPath, {required bool force, required bool navigator}) {
@@ -118,7 +120,7 @@ void _init(String root, String configPath, {required bool force, required bool n
 Next steps:
   1. Fill in test/cerebro/app_factory.dart (buildRouter / buildApp).
   2. dart run cerebro routes     # check which locations will be captured
-  3. dart run cerebro capture    # writes ${p.relative(_outDirFromConfig(configPath) ?? '.cerebro', from: root)}/
+  3. dart run cerebro capture    # writes ${p.relative(_outDirFromConfig(configPath, root) ?? '.cerebro', from: root)}/
 ''');
 }
 

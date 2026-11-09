@@ -1,6 +1,6 @@
 name: cerebro
 description: Headless screenshots, semantics, tap-target and contrast checks, and a tap-by-tap navigation map for Flutter apps, under flutter test. Built for coding agents.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/mattparadis/cerebro-flutter
 homepage: https://github.com/mattparadis/cerebro-flutter
 issue_tracker: https://github.com/mattparadis/cerebro-flutter/issues

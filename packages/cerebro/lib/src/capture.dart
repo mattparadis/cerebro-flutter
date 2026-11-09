@@ -334,6 +334,7 @@ class Cerebro {
           'failed': report.low.length,
           'icons_failed': report.lowIcons.length,
           'not_measurable': report.notMeasurable.length,
+          'not_visible': report.notMeasurable.where((e) => '${e['reason']}'.startsWith('not visible')).length,
           'no_font_family': report.noFontFamily.length,
         };
       }
@@ -350,6 +351,7 @@ class Cerebro {
         File(semPath).writeAsStringSync(dump);
         result['semantics'] = p.relative(semPath, from: outDir);
         result['sha256_semantics'] = sha256.convert(utf8.encode(dump)).toString();
+        result['fingerprint'] = _labelsFingerprint(root);
         final visible = Rect.fromLTWH(
           0,
           0,
@@ -450,11 +452,39 @@ class Cerebro {
         .where((t) => !t.nestedInLargerTarget && !t.fullScreen)
         .take(config.exploreMaxTaps)
         .toList();
-    var unlabeled = 0;
     final frameKey = GlobalKey();
     final outerWrap = wrap;
     wrap = (app) => RepaintBoundary(key: frameKey, child: outerWrap(app));
+    // The test binding records exceptions for takeException() without their
+    // stack; remember the stack of the most recent one for the error edge.
+    final prevOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      _lastErrorStack = details.stack;
+      prevOnError?.call(details);
+    };
+    try {
+      await _exploreTaps(tester, edges, candidates, target, themeMode, config, driver, wrap, env, frameKey);
+    } finally {
+      FlutterError.onError = prevOnError;
+    }
+    return edges;
+  }
+
+  static Future<void> _exploreTaps(
+    WidgetTester tester,
+    List<NavEdge> edges,
+    List<Tappable> candidates,
+    ScreenTarget target,
+    ThemeMode themeMode,
+    CerebroConfig config,
+    ScreenDriver driver,
+    AppWrap wrap,
+    _Env env,
+    GlobalKey frameKey,
+  ) async {
+    var unlabeled = 0;
     for (final t in candidates) {
+      _lastErrorStack = null;
       final label = t.label.isEmpty ? 'unlabeled#${++unlabeled}' : t.label;
       await _applyScenario(tester, env, target);
       await driver.open(tester, target.location, themeMode, wrap);
@@ -465,6 +495,11 @@ class Cerebro {
       final from = before.location;
       final semanticsBefore = _semanticsFingerprint(tester);
       String? error;
+      List<String>? errorStack;
+      void fail(Object e, StackTrace? st) {
+        error ??= _firstLine(e.toString());
+        errorStack ??= _stackFrames(st);
+      }
       final mask = Rect.fromLTWH(t.left - 8, t.top - 8, t.width + 16, t.height + 16);
       final sampler = _FrameSampler(tester, frameKey, mask);
       final busyBefore = await sampler.changedOver(const Duration(milliseconds: 50));
@@ -476,25 +511,28 @@ class Cerebro {
         await runZonedGuarded(() async {
           await tester.tapAt(Offset(t.left + t.width / 2, t.top + t.height / 2));
           await tester.pump();
-        }, (e, st) => error ??= _firstLine(e.toString()));
+        }, fail);
         for (var e = tester.takeException(); e != null; e = tester.takeException()) {
-          error ??= _firstLine(e.toString());
+          fail(e, _lastErrorStack);
         }
         await sampler.sample(const Duration(milliseconds: 50), count: 12);
         for (var i = 0; i < 4; i++) {
           await tester.pump(const Duration(milliseconds: 100));
         }
-      } catch (e) {
-        error = _firstLine(e.toString());
+      } catch (e, st) {
+        fail(e, st);
       }
       final motion = busyBefore ? _Motion.unknown : sampler.classify();
       final selfMotion = busyBefore ? _Motion.unknown : sampler.classifySelf();
       for (var e = tester.takeException(); e != null; e = tester.takeException()) {
-        error ??= _firstLine(e.toString());
+        fail(e, _lastErrorStack);
       }
       final afterSnap = driver.snapshot(tester);
       final depthAfter = afterSnap.depth;
       final to = afterSnap.location;
+      // A Navigator 1.0 push to an unnamed route has no location to match a
+      // captured screen with; keep what the screen reads like instead.
+      final toFingerprint = to.startsWith('(') ? _labelsFingerprintOf(tester) : null;
       final contentChanged = _semanticsFingerprint(tester) != semanticsBefore;
       String? overlay;
       if (find.byType(Dialog).evaluate().isNotEmpty || find.byType(AlertDialog).evaluate().isNotEmpty) {
@@ -526,6 +564,8 @@ class Cerebro {
         kind: kind,
         overlay: overlay,
         error: error,
+        errorStack: errorStack,
+        toFingerprint: toFingerprint,
         x: t.left + t.width / 2,
         y: t.top + t.height / 2,
         transition: noEffect ? null : motion.kind,
@@ -533,7 +573,6 @@ class Cerebro {
         selfTransition: noEffect ? null : selfMotion.kind,
       ));
     }
-    return edges;
   }
 
   /// Composes `.cerebro/proto/<name>.png` for every `/__proto/<name>` route:
@@ -622,6 +661,32 @@ class Cerebro {
     File(p.join(env.outDir, 'PROTO.md')).writeAsStringSync(md.toString());
   }
 
+  /// Hash of the labels, values and hints in the semantics tree, in order,
+  /// without rects or flags: stable across a direct open and a push of the
+  /// same screen, so an unnamed Navigator route can be matched to the
+  /// captured screen it shows.
+  static String _labelsFingerprint(SemanticsNode root) {
+    final parts = <String>[];
+    void walk(SemanticsNode n) {
+      final d = n.getSemanticsData();
+      if (d.label.isNotEmpty || d.value.isNotEmpty || d.hint.isNotEmpty) {
+        parts.add('${d.label}|${d.value}|${d.hint}');
+      }
+      n.visitChildren((c) {
+        walk(c);
+        return true;
+      });
+    }
+    walk(root);
+    return sha256.convert(utf8.encode(parts.join('\n'))).toString();
+  }
+
+  static String? _labelsFingerprintOf(WidgetTester tester) {
+    final renderView = tester.binding.renderViews.firstWhere((r) => r.flutterView == tester.view);
+    final root = renderView.owner?.semanticsOwner?.rootSemanticsNode;
+    return root == null ? null : _labelsFingerprint(root);
+  }
+
   /// Cheap fingerprint of what assistive tech would read: labels, values,
   /// flags and rects, without object ids. Changes when a filter is applied,
   /// a page scrolls, an item expands or a field gets text.
@@ -682,7 +747,7 @@ class Cerebro {
 
   static Map<String, List<String>> _resolveFonts(Map<String, List<String>> fonts, String root) => {
         for (final e in fonts.entries)
-          e.key: [for (final f in e.value) p.isAbsolute(f) ? f : p.join(root, f)],
+          e.key: [for (final f in e.value) resolveFontPath(f, root)],
       };
 
   static void _writeJson(String path, Object data) {
@@ -690,6 +755,29 @@ class Cerebro {
   }
 
   static String _firstLine(String s) => s.split('\n').first.trim();
+
+  /// Stack of the last FlutterError reported while a tap was explored
+  /// (`takeException` returns the exception only).
+  static StackTrace? _lastErrorStack;
+
+  /// Up to eight frames, the app's own (`package:<app>`) first, then the
+  /// rest in order; framework-only stacks keep their first frames.
+  static List<String>? _stackFrames(StackTrace? st, {int max = 8}) {
+    if (st == null) return null;
+    final frames = st
+        .toString()
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith('<asynchronous suspension>'))
+        .map((l) => l.replaceFirst(RegExp(r'^#\d+\s+'), ''))
+        .toList();
+    bool framework(String f) =>
+        f.contains('package:flutter/') || f.contains('package:flutter_test/') || f.contains('dart:') || f.contains('package:cerebro/');
+    final app = frames.where((f) => !framework(f)).toList();
+    final rest = frames.where(framework).toList();
+    final out = [...app, ...rest].take(max).toList();
+    return out.isEmpty ? null : out;
+  }
 
   static String _fmtScale(double v) {
     final s = v.toStringAsFixed(2);
@@ -908,6 +996,22 @@ ContrastReport measureTextContrast(
       continue;
     }
     final fg = compositeOver(argb, bg);
+    // Covered or clipped text: the rect is one flat colour, no glyph pixels.
+    // Measuring it would score the covering surface, not the text.
+    if (contrastRatio(fg, bg) >= 1.3 &&
+        paintedFraction(rgba, imageW, imageH, left: left, top: top, width: w, height: h, foreground: fg, background: bg) <
+            0.003) {
+      notMeasurable.add({
+        'text': plain.length > 40 ? '${plain.substring(0, 40)}…' : plain,
+        'reason': 'not visible in the screenshot: covered by an opaque surface (fixed bar, sheet) or clipped',
+        'status': 'suspected',
+        'x': Tappable._r(rect.left),
+        'y': Tappable._r(rect.top),
+        'width': Tappable._r(rect.width),
+        'height': Tappable._r(rect.height),
+      });
+      continue;
+    }
     final ratio = contrastRatio(fg, bg);
     final fontSize = style?.fontSize ?? 14;
     final bold = (style?.fontWeight?.value ?? 400) >= FontWeight.w700.value;
@@ -989,6 +1093,7 @@ class Tappable {
     this.nestedInLargerTarget = false,
     this.fullScreen = false,
     this.clipped = false,
+    this.hint,
   });
 
   final String label;
@@ -1010,6 +1115,10 @@ class Tappable {
   /// keyboard. Its real size is unknown, so it is not a small-target finding.
   final bool clipped;
 
+  /// A suggested fix when the shape of the finding is a known pattern, e.g.
+  /// an unlabeled checkbox/radio/switch sitting next to its own text row.
+  final String? hint;
+
   Map<String, Object?> toJson() => {
         'label': label,
         'x': _r(left),
@@ -1019,6 +1128,7 @@ class Tappable {
         'nested_in_larger_target': nestedInLargerTarget,
         if (fullScreen) 'full_screen': true,
         if (clipped) 'clipped': true,
+        if (hint != null) 'hint': hint,
       };
 
   static double _r(double v) => (v * 10).roundToDouble() / 10;
@@ -1081,6 +1191,12 @@ List<Tappable> collectTappables(
                   : data.hint)
           .replaceAll('\n', ' / ');
       final key = '$label|${r.left.round()}|${r.top.round()}|${r.width.round()}|${r.height.round()}';
+      final isToggle = data.flagsCollection.isChecked != ui.CheckedState.none || data.flagsCollection.isToggled != ui.Tristate.none;
+      final hint = label.isEmpty && isToggle && !nested
+          ? 'Unlabeled checkbox/radio/switch: the row text next to it is a separate, non-tappable node. '
+              'Merge them into one target with CheckboxListTile / RadioListTile / SwitchListTile '
+              '(or wrap row and control in one InkWell with a Semantics label).'
+          : null;
       if (seen.add(key)) {
         out.add(Tappable(
           label: label,
@@ -1091,6 +1207,7 @@ List<Tappable> collectTappables(
           nestedInLargerTarget: nested,
           fullScreen: fullScreen,
           clipped: clipped,
+          hint: hint,
         ));
       }
     }

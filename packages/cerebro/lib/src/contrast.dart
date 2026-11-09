@@ -148,6 +148,41 @@ int? sampleBackground(
   return ((s[0] ~/ n) << 16) | ((s[1] ~/ n) << 8) | (s[2] ~/ n);
 }
 
+/// Fraction of the rect's pixels that carry paint other than [background]:
+/// pixels nearer to [foreground] than to the background, or moved at least
+/// 30% of the way from the background towards anything else (faded text
+/// under an Opacity still counts). A text whose rect is painted in one flat
+/// colour (fraction ~0) is not visible in the screenshot: an opaque surface
+/// covers it, or it is clipped away.
+double paintedFraction(
+  Uint8List rgba,
+  int imageWidth,
+  int imageHeight, {
+  required int left,
+  required int top,
+  required int width,
+  required int height,
+  required int foreground,
+  required int background,
+}) {
+  final x0 = left.clamp(0, imageWidth), y0 = top.clamp(0, imageHeight);
+  final x1 = (left + width).clamp(0, imageWidth), y1 = (top + height).clamp(0, imageHeight);
+  if (x1 - x0 < 1 || y1 - y0 < 1) return 0;
+  final span = _distance(foreground, background);
+  final threshold = math.max(12.0, span * 0.3);
+  var painted = 0, total = 0;
+  for (var y = y0; y < y1; y++) {
+    for (var x = x0; x < x1; x++) {
+      final i = (y * imageWidth + x) * 4;
+      final c = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+      total++;
+      final dBg = _distance(c, background);
+      if (dBg > threshold || dBg > _distance(c, foreground)) painted++;
+    }
+  }
+  return total == 0 ? 0 : painted / total;
+}
+
 /// Composites an ARGB colour with alpha over an opaque 0xRRGGBB background.
 int compositeOver(int argb, int background) {
   final a = ((argb >> 24) & 0xFF) / 255.0;

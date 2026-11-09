@@ -67,6 +67,14 @@ const lintRules = <String, LintRule>{
       'GestureDetector with onTap and no Semantics/Tooltip nearby is invisible to assistive tech.'),
   'pump-and-settle': LintRule('pump-and-settle', 'info',
       'pumpAndSettle hangs on indeterminate progress indicators; prefer pump(duration).'),
+  'scroll-from-listener': LintRule('scroll-from-listener', 'info',
+      'jumpTo/animateTo called from a listener without a hasClients check: when this screen is under '
+      'another route (offstage) the controller has no position and the call throws. Guard with '
+      '`controller.hasClients` (and `ModalRoute.of(context)?.isCurrent` when the intent is a visible scroll).'),
+  'go-route-builder-transitions': LintRule('go-route-builder-transitions', 'info',
+      'GoRoute(builder:) without pageBuilder and no PageTransitionsTheme in the app: go_router may build '
+      'NoTransitionPage, so pages appear with no motion. Verify with `cerebro capture --explore` '
+      '(push/pop edges should not be `instant`); fix with pageBuilder + MaterialPage/CupertinoPage or an explicit PageTransitionsTheme.'),
 };
 
 class LintOptions {
@@ -101,8 +109,19 @@ final _platformIo = RegExp(r'\bPlatform\.is(IOS|Android|MacOS|Windows|Linux)\b')
 final _gesture = RegExp(r'\bGestureDetector\(');
 final _imageNetwork = RegExp(r'\bImage\.network\(');
 final _pumpAndSettle = RegExp(r'\bpumpAndSettle\(');
+final _scrollCall = RegExp(r'\.(jumpTo|animateTo)\(');
+final _listenerContext = RegExp(r'\b(addListener|listen|listener|onData|onChanged|whenData|when)\s*[(:]|\bref\.listen');
+final _scrollGuard = RegExp(r'\bhasClients\b|\bisCurrent\b');
+final _goRouteBuilder = RegExp(r'\bGoRoute\(');
 
-List<LintFinding> lintFile(String relPath, String source, {LintOptions options = const LintOptions()}) {
+List<LintFinding> lintFile(
+  String relPath,
+  String source, {
+  LintOptions options = const LintOptions(),
+  /// Whether any file of the project sets a `PageTransitionsTheme`; null
+  /// means "look at this file only" (single-file use).
+  bool? projectHasPageTransitionsTheme,
+}) {
   final out = <LintFinding>[];
   final lines = source.split('\n');
   final isTest = relPath.startsWith('test/') || relPath.contains('/test/');
@@ -169,6 +188,23 @@ List<LintFinding> lintFile(String relPath, String source, {LintOptions options =
       final window = lines.skip(i).take(8).join('\n');
       if (!window.contains('errorBuilder:')) add('network-image-no-error-builder', i);
     }
+    if (_scrollCall.hasMatch(code)) {
+      // Only inside a listener-shaped context: a jumpTo in a button handler
+      // runs while the screen is current, a listener can fire offstage.
+      final before = lines.skip(i < 12 ? 0 : i - 12).take(i < 12 ? i : 12).join('\n');
+      final around = '$before\n${lines.skip(i).take(3).join('\n')}';
+      if (_listenerContext.hasMatch(before) && !_scrollGuard.hasMatch(around)) {
+        add('scroll-from-listener', i);
+      }
+    }
+  }
+
+  if (!isTest && _goRouteBuilder.hasMatch(source) && source.contains('builder:') && !source.contains('pageBuilder:')) {
+    final hasTheme = projectHasPageTransitionsTheme ?? RegExp(r'PageTransitionsTheme|pageTransitionsTheme').hasMatch(source);
+    if (!hasTheme) {
+      final idx = lines.indexWhere((l) => _goRouteBuilder.hasMatch(l));
+      add('go-route-builder-transitions', idx < 0 ? 0 : idx);
+    }
   }
 
   if (!isTest && source.contains('Scaffold(') && !source.contains('CupertinoPageScaffold(')) {
@@ -226,6 +262,7 @@ String _stripComment(String line) {
 /// Scans `lib/` (and `test/` for test-only rules) under [root].
 List<LintFinding> lintProject(String root, {LintOptions options = const LintOptions()}) {
   final out = <LintFinding>[];
+  final sources = <String, String>{};
   for (final dirName in ['lib', 'test']) {
     final dir = Directory(p.join(root, dirName));
     if (!dir.existsSync()) continue;
@@ -238,8 +275,14 @@ List<LintFinding> lintProject(String root, {LintOptions options = const LintOpti
     for (final f in files) {
       final rel = p.relative(f.path, from: root).replaceAll('\\', '/');
       if (rel.startsWith('test/cerebro/')) continue;
-      out.addAll(lintFile(rel, f.readAsStringSync(), options: options));
+      sources[rel] = f.readAsStringSync();
     }
+  }
+  final hasTransitionsTheme = sources.entries
+      .where((e) => e.key.startsWith('lib/'))
+      .any((e) => RegExp(r'PageTransitionsTheme|pageTransitionsTheme').hasMatch(e.value));
+  for (final e in sources.entries) {
+    out.addAll(lintFile(e.key, e.value, options: options, projectHasPageTransitionsTheme: hasTransitionsTheme));
   }
   return out;
 }

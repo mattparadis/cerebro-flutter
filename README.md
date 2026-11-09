@@ -326,8 +326,20 @@ scroll view or by the keyboard inset is listed under `tappables_clipped`
 (its real size is unknown) instead of `tappables_below_min`, and a text
 whose rect is crossed by a FAB or a sticky button, or whose measured ratio
 is below 1.3:1, goes to `contrast_not_measurable` with reason
-`occluded by "<label>"` rather than to `low_contrast`. Each explored edge
-also has `self_transition`, the motion inside the tapped control itself.
+`occluded by "<label>"` rather than to `low_contrast`; a text whose rect
+shows no glyph pixels at all (it sits under an opaque bottom bar or sheet,
+or is clipped) goes there with reason `not visible`, and the summary counts
+them as `not_visible_texts`: a layout observation (content with no bottom
+padding under a fixed bar), not a contrast one. An unlabeled
+checkbox/radio/switch next to its own text carries a `hint` with the
+one-target fix. Each explored edge also has `self_transition`, the motion
+inside the tapped control itself, and an `error` edge carries `error_stack`
+(the app's own frames first).
+
+In Navigator 1.0 apps a push to an unnamed `MaterialPageRoute` has no
+location to match a captured screen with; the map matches it by what the
+screen reads like (a labels fingerprint) when exactly one captured route
+reads the same, and says so in `MAP.md` (`resolved_by_fingerprint`).
 
 Prototype routes (`/__proto/<name>`, captured with `-D UI_PROTO=true`) are
 also composed into one sheet per screen, `.cerebro/proto/<name>.png` (one
@@ -491,7 +503,10 @@ Regex rules for the design defects the Dart analyzer does not know about,
 each with `file:line`: `hardcoded-color`, `literal-font-size`,
 `empty-handler`, `small-icon-button`, `deprecated-will-pop-scope`,
 `platform-io-check`, `no-safe-area`, `network-image-no-error-builder`,
-`gesture-without-semantics`, `pump-and-settle` (tests). Severities:
+`gesture-without-semantics`, `scroll-from-listener` (jumpTo/animateTo in a
+listener without `hasClients`), `go-route-builder-transitions`
+(`GoRoute(builder:)` with no `pageBuilder` and no `PageTransitionsTheme`
+anywhere: pages may get no transition), `pump-and-settle` (tests). Severities:
 `error` and `warning` are structural defects; `hardcoded-color` and
 `literal-font-size` are `convention` findings, defects only when the
 rendered result is wrong. `// cerebro: ignore <reason>` on a line is a
@@ -522,7 +537,7 @@ routes:
   "/login":     { keyboard: true }   # extra capture with the keyboard open (__kb)
   "/debug":     { skip: true }
 exclude: []
-fonts: {}                   # family -> font files, for custom fonts
+fonts: {}                   # family -> font files (project paths or packages/<pkg>/fonts/x.ttf asset keys)
 out_dir: .cerebro
 explore: false              # tap every target and record navigation edges
 explore_max_taps: 40

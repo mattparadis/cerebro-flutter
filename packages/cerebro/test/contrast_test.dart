@@ -70,4 +70,30 @@ void main() {
     final img = _image(40, 20, 0xFFFFFF, fg: 0xF0F0F0);
     expect(estimateContrast(img, 40, 20, left: 0, top: 0, width: 40, height: 20), isNull);
   });
+
+  test('paintedFraction is ~0 for a flat rect and >0 once glyph pixels are present', () {
+    const w = 40, h = 20;
+    final rgba = Uint8List(w * h * 4);
+    void fill(int x0, int y0, int x1, int y1, int rgb) {
+      for (var y = y0; y < y1; y++) {
+        for (var x = x0; x < x1; x++) {
+          final i = (y * w + x) * 4;
+          rgba[i] = (rgb >> 16) & 0xFF;
+          rgba[i + 1] = (rgb >> 8) & 0xFF;
+          rgba[i + 2] = rgb & 0xFF;
+          rgba[i + 3] = 255;
+        }
+      }
+    }
+    fill(0, 0, w, h, 0xFFFFFF); // the bar covering the text
+    final covered = paintedFraction(rgba, w, h, left: 0, top: 0, width: w, height: h, foreground: 0x212121, background: 0xFFFFFF);
+    expect(covered, 0);
+    fill(4, 6, 24, 8, 0x212121); // a stroke of dark text
+    final visible = paintedFraction(rgba, w, h, left: 0, top: 0, width: w, height: h, foreground: 0x212121, background: 0xFFFFFF);
+    expect(visible, greaterThan(0.03));
+    fill(0, 0, w, h, 0xFFFFFF);
+    fill(4, 6, 24, 8, 0xA9A9A9); // the same text at 38% opacity still counts as painted
+    final faded = paintedFraction(rgba, w, h, left: 0, top: 0, width: w, height: h, foreground: 0x212121, background: 0xFFFFFF);
+    expect(faded, greaterThan(0.03));
+  });
 }

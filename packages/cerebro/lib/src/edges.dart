@@ -8,6 +8,8 @@ class NavEdge {
     required this.kind,
     this.overlay,
     this.error,
+    this.errorStack,
+    this.toFingerprint,
     required this.x,
     required this.y,
     this.transition,
@@ -31,6 +33,14 @@ class NavEdge {
   /// `dialog`, `sheet`, `snackbar`, `menu` when [kind] is `overlay`.
   final String? overlay;
   final String? error;
+
+  /// First frames of the stack behind [error] (app frames first), so the
+  /// agent can locate the throwing handler without reproducing the tap.
+  final List<String>? errorStack;
+
+  /// Labels fingerprint of the screen after the tap, only when [to] is an
+  /// unnamed route; NavMap matches it to a captured screen's `fingerprint`.
+  final String? toFingerprint;
   final double x;
   final double y;
 
@@ -55,6 +65,8 @@ class NavEdge {
         'kind': kind,
         if (overlay != null) 'overlay': overlay,
         if (error != null) 'error': error,
+        if (errorStack != null && errorStack!.isNotEmpty) 'error_stack': errorStack,
+        if (toFingerprint != null) 'to_fingerprint': toFingerprint,
         'x': x,
         'y': y,
         if (transition != null) 'transition': transition,

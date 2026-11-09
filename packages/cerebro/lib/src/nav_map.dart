@@ -37,12 +37,25 @@ class NavMap {
     final drawn = nodes.where((n) => connected.contains(n.route)).toList();
     final unreached = nodes.where((n) => !connected.contains(n.route)).map((n) => n.route).toList();
     final unresolved = <String>{};
+    var byFingerprint = 0;
     for (final e in navEdges) {
       if (e['kind'] == 'push' || e['kind'] == 'go') {
-        if (routeFor('${e['to']}', nodes) == null) unresolved.add('${e['to']}');
+        if (targetFor(e, nodes) == null) {
+          unresolved.add('${e['to']}');
+        } else if (resolvedByFingerprint(e, nodes)) {
+          byFingerprint++;
+        }
       }
     }
-    if (drawn.isEmpty) return {'nodes': 0, 'edges': 0, 'unreached': unreached, 'unresolved_targets': unresolved.toList()};
+    if (drawn.isEmpty) {
+      return {
+        'nodes': 0,
+        'edges': 0,
+        'unreached': unreached,
+        'unresolved_targets': unresolved.toList(),
+        'resolved_by_fingerprint': byFingerprint,
+      };
+    }
     final dot = renderDot(drawn, agg);
     final dotPath = p.join(outDir, 'map.dot');
     File(dotPath).writeAsStringSync(dot);
@@ -53,6 +66,7 @@ class NavMap {
       'edges': agg.length,
       'unreached': unreached,
       'unresolved_targets': unresolved.toList(),
+      'resolved_by_fingerprint': byFingerprint,
     };
     for (final fmt in ['png', 'svg']) {
       try {
@@ -93,7 +107,16 @@ class NavMap {
       if (route.startsWith('/__proto')) continue;
       device ??= '${s['device']}';
       if ('${s['device']}' != device) continue;
-      byRoute.putIfAbsent(route, () => NavNode(route: route, location: location, png: '${s['png']}'));
+      byRoute.putIfAbsent(
+        route,
+        () => NavNode(
+          route: route,
+          location: location,
+          png: '${s['png']}',
+          fingerprint: s['fingerprint'] as String?,
+          redirected: s['redirected_to'] != null,
+        ),
+      );
     }
     return byRoute.values.toList();
   }
@@ -117,6 +140,26 @@ class NavMap {
     return best?.route;
   }
 
+  /// Resolves an edge's target: by location first, then (for unnamed
+  /// Navigator routes) by the labels fingerprint of the screen after the
+  /// tap, when exactly one captured screen reads the same.
+  static String? targetFor(Map<String, Object?> e, List<NavNode> nodes) {
+    final byLocation = routeFor('${e['to']}', nodes);
+    if (byLocation != null) return byLocation;
+    final fp = e['to_fingerprint'];
+    if (fp == null) return null;
+    var matches = nodes.where((n) => n.fingerprint == fp).toList();
+    // Routes that redirected show someone else's screen (an auth guard
+    // sending /account to the login): the route that owns the screen is the
+    // one that did not redirect.
+    if (matches.length > 1) matches = matches.where((n) => !n.redirected).toList();
+    return matches.length == 1 ? matches.first.route : null;
+  }
+
+  /// True when [targetFor] needed the fingerprint.
+  static bool resolvedByFingerprint(Map<String, Object?> e, List<NavNode> nodes) =>
+      routeFor('${e['to']}', nodes) == null && targetFor(e, nodes) != null;
+
   /// Groups edges by (from route, to route, kind); keeps up to two labels,
   /// the count and how many of them were instant.
   static List<NavEdgeGroup> aggregate(List<NavNode> nodes, List<Map<String, Object?>> edges) {
@@ -127,9 +170,9 @@ class NavMap {
       if (from == null) continue;
       String? to;
       if (kind == 'overlay' || kind == 'error') {
-        to = routeFor('${e['to']}', nodes) ?? from;
+        to = targetFor(e, nodes) ?? from;
       } else {
-        to = routeFor('${e['to']}', nodes);
+        to = targetFor(e, nodes);
         if (to == null || to == from) continue;
       }
       final key = '$from|$to|$kind';
@@ -151,10 +194,28 @@ class NavMap {
       ..writeln('  graph [rankdir=LR, bgcolor="transparent", pad=0.3, nodesep=0.45, ranksep=1.0, fontname="Helvetica"];')
       ..writeln('  node [shape=none, margin=0, fontname="Helvetica", fontsize=12, fontcolor="#6B7280"];')
       ..writeln('  edge [fontname="Helvetica", fontsize=9, arrowsize=0.7, penwidth=1.2];');
-    for (final n in nodes) {
-      b.writeln('  "${esc(n.route)}" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">'
-          '<TR><TD WIDTH="112" HEIGHT="242" FIXEDSIZE="TRUE"><IMG SCALE="TRUE" SRC="${html(n.png)}"/></TD></TR>'
-          '<TR><TD>${html(n.route)}</TD></TR></TABLE>>];');
+    String nodeDecl(NavNode n) => '"${esc(n.route)}" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">'
+        '<TR><TD WIDTH="112" HEIGHT="242" FIXEDSIZE="TRUE"><IMG SCALE="TRUE" SRC="${html(n.png)}"/></TD></TR>'
+        '<TR><TD>${html(n.route)}</TD></TR></TABLE>>];';
+    // Routes whose only edges point at themselves (a dialog, a retry) have
+    // no rank of their own and would pile up in the first column; chain
+    // them with invisible edges so they sit in one row, boxed apart.
+    final linked = <String>{for (final g in groups) if (g.from != g.to) ...[g.from, g.to]};
+    final selfOnly = nodes.where((n) => !linked.contains(n.route)).toList();
+    final main = nodes.where((n) => linked.contains(n.route)).toList();
+    for (final n in main) {
+      b.writeln('  ${nodeDecl(n)}');
+    }
+    if (selfOnly.isNotEmpty) {
+      b.writeln('  subgraph cluster_self {');
+      b.writeln('    label="overlays only (dialogs, retries: no route change)"; labeljust=l; fontsize=10; fontcolor="#9AA0AB"; color="#9AA0AB"; style=dashed;');
+      for (final n in selfOnly) {
+        b.writeln('    ${nodeDecl(n)}');
+      }
+      if (selfOnly.length > 1) {
+        b.writeln('    ${selfOnly.map((n) => '"${esc(n.route)}"').join(' -> ')} [style=invis];');
+      }
+      b.writeln('  }');
     }
     for (final g in groups) {
       final color = _colors[g.kind] ?? '#6B7280';
@@ -179,10 +240,18 @@ class NavMap {
 }
 
 class NavNode {
-  NavNode({required this.route, required this.location, required this.png});
+  NavNode({required this.route, required this.location, required this.png, this.fingerprint, this.redirected = false});
   final String route;
   final String location;
   final String png;
+
+  /// The capture of this route ended on another location (auth guard,
+  /// redirect): its screenshot shows that other screen.
+  final bool redirected;
+
+  /// Labels fingerprint of the captured screen (see `fingerprint` in
+  /// results), used to resolve taps whose target has no location.
+  final String? fingerprint;
 }
 
 class NavEdgeGroup {

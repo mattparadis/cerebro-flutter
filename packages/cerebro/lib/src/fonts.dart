@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -108,6 +109,43 @@ Future<FontLoadReport> loadRealFonts({
   }
 
   return FontLoadReport(flutterRoot: root, families: families, warnings: warnings);
+}
+
+/// Resolves a font path from `cerebro.yaml` to a file path. Relative paths
+/// are joined to [root]; a package asset key (`packages/<pkg>/fonts/x.ttf`,
+/// the form `TextStyle(package:)` and `pubspec.yaml` fonts use) is mapped to
+/// `<pkg root>/lib/fonts/x.ttf` through `.dart_tool/package_config.json`
+/// ([packageConfig] overrides the file, for tests). Unknown packages fall
+/// back to the literal path so the caller reports it as missing.
+String resolveFontPath(String path, String root, {Map<String, Object?>? packageConfig}) {
+  if (p.isAbsolute(path)) return path;
+  final m = RegExp(r'^packages/([A-Za-z0-9_]+)/(.+)$').firstMatch(path);
+  if (m != null) {
+    final pkgRoot = _packageRoot(m.group(1)!, root, packageConfig);
+    if (pkgRoot != null) return p.join(pkgRoot, 'lib', m.group(2)!);
+  }
+  return p.join(root, path);
+}
+
+String? _packageRoot(String name, String root, Map<String, Object?>? packageConfig) {
+  var config = packageConfig;
+  final file = File(p.join(root, '.dart_tool', 'package_config.json'));
+  if (config == null) {
+    if (!file.existsSync()) return null;
+    try {
+      config = (jsonDecode(file.readAsStringSync()) as Map).cast<String, Object?>();
+    } catch (_) {
+      return null;
+    }
+  }
+  for (final pkg in (config['packages'] as List?) ?? const []) {
+    if (pkg is! Map || pkg['name'] != name) continue;
+    final uri = Uri.parse('${pkg['rootUri']}');
+    final base = Uri.directory(p.join(root, '.dart_tool') + Platform.pathSeparator);
+    final resolved = uri.hasScheme ? uri : base.resolveUri(uri);
+    return resolved.scheme == 'file' ? resolved.toFilePath() : null;
+  }
+  return null;
 }
 
 /// Synchronous on purpose: this may run inside a `testWidgets` FakeAsync

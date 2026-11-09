@@ -104,4 +104,51 @@ SizedBox(
     expect(md, contains('## hardcoded-color (convention, 1)'));
     expect(md, contains('`lib/a.dart:1`'));
   });
+
+  test('scroll-from-listener fires in a listener without hasClients, not in a handler', () {
+    const bad = '''
+class S extends State<W> {
+  void initState() {
+    widget.resetSignal.addListener(() {
+      _scroll.jumpTo(0);
+    });
+  }
+}
+''';
+    const guarded = '''
+class S extends State<W> {
+  void initState() {
+    widget.resetSignal.addListener(() {
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    });
+  }
+}
+''';
+    const handler = '''
+FilledButton(onPressed: () => _scroll.animateTo(0, duration: d, curve: c), child: t)
+''';
+    expect(lintFile('lib/a.dart', bad).map((f) => f.rule), contains('scroll-from-listener'));
+    expect(lintFile('lib/a.dart', guarded).map((f) => f.rule), isNot(contains('scroll-from-listener')));
+    expect(lintFile('lib/a.dart', handler).map((f) => f.rule), isNot(contains('scroll-from-listener')));
+  });
+
+  test('go-route-builder-transitions depends on pageBuilder and the project theme', () {
+    const routes = '''
+final router = GoRouter(routes: [
+  GoRoute(path: '/', builder: (c, s) => const Home()),
+]);
+''';
+    const withPage = '''
+final router = GoRouter(routes: [
+  GoRoute(path: '/', pageBuilder: (c, s) => const MaterialPage(child: Home())),
+]);
+''';
+    rules(String src, {bool? theme}) =>
+        lintFile('lib/router.dart', src, projectHasPageTransitionsTheme: theme).map((f) => f.rule);
+    expect(rules(routes), contains('go-route-builder-transitions'));
+    expect(rules(routes, theme: false), contains('go-route-builder-transitions'));
+    expect(rules(routes, theme: true), isNot(contains('go-route-builder-transitions')));
+    expect(rules(withPage), isNot(contains('go-route-builder-transitions')));
+    expect(rules('$routes\nfinal t = PageTransitionsTheme();'), isNot(contains('go-route-builder-transitions')));
+  });
 }
