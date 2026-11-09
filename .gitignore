@@ -6,8 +6,8 @@ pubspec.lock
 *.iml
 .idea/
 .vscode/
-# ui_map output (screenshots, semantics, audits). Regenerate with
-# `dart run ui_map capture`; commit it in your own project if you want diffs.
-.ui-map/
+# cerebro output (screenshots, semantics, audits). Regenerate with
+# `dart run cerebro capture`; commit it in your own project if you want diffs.
+.cerebro/
 # scratch copy used to test Codex side by side with Claude Code
 example/demo_app_codex/

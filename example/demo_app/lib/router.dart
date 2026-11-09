@@ -15,10 +15,10 @@ import 'screens/settings_screen.dart';
 import 'screens/shell_scaffold.dart';
 
 /// Compile-time flag that exposes prototype routes (`/__proto/...`) to the
-/// ui_map capture: `dart run ui_map capture -D UI_PROTO=true`.
+/// cerebro capture: `dart run cerebro capture -D UI_PROTO=true`.
 const kUiProto = bool.fromEnvironment('UI_PROTO');
 
-/// Builds the app router. [initialLocation] exists so tests and the ui_map
+/// Builds the app router. [initialLocation] exists so tests and the cerebro
 /// harness can open the app directly on any screen.
 GoRouter buildRouter({String initialLocation = '/'}) {
   return GoRouter(

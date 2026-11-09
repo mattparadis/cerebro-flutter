@@ -1,4 +1,4 @@
-// Flow contract for note creation (see skills/design-screen/references/patterns.md,
+// Flow contract for note creation (see skills/cerebro-design/references/patterns.md,
 // "Flow contracts"): verified against the in-memory repository, not the UI alone.
 import 'package:demo_app/app.dart';
 import 'package:demo_app/data/notes_repository.dart';

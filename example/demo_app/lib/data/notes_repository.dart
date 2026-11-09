@@ -68,7 +68,7 @@ class NotesRepository {
   }
 
   /// Test seam: when set, every list() ignores the requested state and uses
-  /// this one. ui_map scenarios in test/ui_map/app_factory.dart set it to
+  /// this one. cerebro scenarios in test/cerebro/app_factory.dart set it to
   /// capture screens whose URL has no `?state=` hook.
   static ListState? scenarioOverride;
 

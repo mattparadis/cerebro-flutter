@@ -1,5 +1,5 @@
 name: demo_app
-description: "Demo Flutter app used as a fixture for ui_map and the audit-screens skill."
+description: "Demo Flutter app used as a fixture for cerebro and the cerebro-audit skill."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -15,8 +15,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  ui_map:
-    path: ../../packages/ui_map
+  cerebro:
+    path: ../../packages/cerebro
 
 flutter:
   uses-material-design: true

@@ -2,7 +2,7 @@
 # usage: run_one.sh <label> <dir> [prompt-file]
 set -u
 LABEL="$1"; DIR="$2"
-OUT=/home/matt/code/flutter-ui-ux-design-skill/experiments
+OUT=/home/matt/code/cerebro-flutter/experiments
 PROMPT="$(cat "${3:-$OUT/prompt.txt}")"
 cd "$DIR" || exit 1
 START=$(date +%s)

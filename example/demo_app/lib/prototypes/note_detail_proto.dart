@@ -1,7 +1,7 @@
 // Prototype directions for a redesigned note detail screen. Throwaway code:
 // only compiled into the router when built with --dart-define=UI_PROTO=true.
-// Used by the design-screen skill's prototype mode and by the demo capture
-// (`dart run ui_map capture -D UI_PROTO=true`).
+// Used by the cerebro-design skill's prototype mode and by the demo capture
+// (`dart run cerebro capture -D UI_PROTO=true`).
 import 'package:flutter/material.dart';
 
 const _title = 'Soil sample, north field';
